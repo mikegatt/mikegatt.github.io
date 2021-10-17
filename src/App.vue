@@ -1,28 +1,76 @@
+<!-- App.vue -->
 <template>
-  <div id="app">
-    <img alt="Vue logo" src="./assets/logo.png">
-    <HelloWorld msg="Welcome to Your Vue.js App"/>
-  </div>
+  <v-app>
+    <v-navigation-drawer v-model="drawer" absolute temporary>
+      <v-list-item>
+        <v-list-item-content>
+          <v-list-item-title>Available calcs:</v-list-item-title>
+        </v-list-item-content>
+      </v-list-item>
+
+      <v-divider></v-divider>
+
+      <v-list dense>
+        <v-list-group :value="false" prepend-icon="mdi-chart-line">
+          <template v-slot:activator>
+            <v-list-item-content>
+              <v-list-item-title>Analysis</v-list-item-title>
+            </v-list-item-content>
+          </template>
+
+          <v-list-item v-for="analysisItem in analysisItems" :key="analysisItem.title" :to="analysisItem.to" link>
+            <v-list-item-content>
+              <v-list-item-title>{{ analysisItem.title }}</v-list-item-title>
+            </v-list-item-content>
+          </v-list-item>
+        </v-list-group>
+
+        <v-list-item v-for="item in items" :key="item.title" :to="item.to" link>
+          <v-list-item-icon>
+            <v-icon>{{ item.icon }}</v-icon>
+          </v-list-item-icon>
+
+          <v-list-item-content>
+            <v-list-item-title>{{ item.title }}</v-list-item-title>
+          </v-list-item-content>
+        </v-list-item>
+      </v-list>
+    </v-navigation-drawer>
+
+    <v-app-bar app>
+      <h2>Mike's engineering calcs</h2>
+      <v-spacer></v-spacer>
+      <v-btn color="orange" dark @click.stop="drawer = !drawer">
+        Calcs
+      </v-btn>
+    </v-app-bar>
+
+    <v-main>
+      <v-container fluid>
+        <router-view></router-view>
+      </v-container>
+    </v-main>
+
+    <v-footer app>
+      <v-spacer/>2021
+    </v-footer>
+  </v-app>
 </template>
 
 <script>
-import HelloWorld from './components/HelloWorld.vue'
-
 export default {
-  name: 'App',
-  components: {
-    HelloWorld
-  }
-}
-</script>
+  name: "App",
 
-<style>
-#app {
-  font-family: Avenir, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-align: center;
-  color: #2c3e50;
-  margin-top: 60px;
-}
-</style>
+  data: () => ({
+    drawer: null,
+    analysisItems: [
+      { title: "UDL", to: "/analysis/udl" },
+      { title: "partial", to: "/analysis/partial" }
+    ],
+    items: [
+      { title: "Vibration", to: "/vibration", icon: "mdi-access-point" },
+      { title: "Refurbishment CO2", to: "/refurbCO2", icon: "mdi-factory" }
+    ]
+  })
+};
+</script>
