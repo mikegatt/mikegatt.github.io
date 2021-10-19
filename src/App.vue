@@ -52,7 +52,6 @@
     </v-main>
 
     <v-footer app>
-      <v-spacer/>2021
     </v-footer>
   </v-app>
 </template>
@@ -69,7 +68,8 @@ export default {
     ],
     items: [
       { title: "Vibration", to: "/vibration", icon: "mdi-access-point" },
-      { title: "Refurbishment CO2", to: "/refurbCO2", icon: "mdi-factory" }
+      { title: "Refurbishment CO2", to: "/refurbCO2", icon: "mdi-factory" },
+      {title:"RC beam", to:"/rcbeam",icon:"mdi-calculator"}
     ]
   })
 };
