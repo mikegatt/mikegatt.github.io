@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0" xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="TaskPaneApp">
+  <Id>29364931-c79e-449b-83ac-0bdf877629f5</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>momentumengineering</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+  <DisplayName DefaultValue="Calcs for word"/>
+  <Description DefaultValue="Calcs for word"/>
+  <IconUrl DefaultValue="https://localhost:3000/assets/icon-32.png"/>
+  <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/icon-64.png"/>
+  <SupportUrl DefaultValue="https://www.contoso.com/help"/>
+  <AppDomains>
+    <AppDomain>https://www.momentumengineering.com</AppDomain>
+  </AppDomains>
+  <Hosts>
+    <Host Name="Document"/>
+  </Hosts>
+  <DefaultSettings>
+    <SourceLocation DefaultValue="https://localhost:3000/taskpane.html"/>
+  </DefaultSettings>
+  <Permissions>ReadWriteDocument</Permissions>
+  <!-- ===== Host-Specific Requirements ===== -->
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/2015/06/OfficeExtensions/Manifest" xsi:type="HostAppVersion">
+
+    <!-- ─── Word Desktop / Web ─── -->
+    <Hosts>
+      <Host xsi:type="document">
+        <HostRequirements>
+          <Requirements>
+            <Sets>
+              <Set Name="TextBinding" MinVersion="1.1" />
+            </Sets>
+          </Requirements>
+        </HostRequirements>
+
+        <DesktopFormFactor>
+          <ProgId>WD.EXE.16</ProgId>
+          <TaskPaneExtension>
+            <!-- unique ID – keep stable across publishes -->
+            <Id>CalcDocTaskPane</Id>
+            <Source>https://localhost:3000/taskpane.html</Source>
+          </TaskPaneExtension>
+        </DesktopFormFactor>
+
+        <WebExtension>
+          <Id>CalcDocTaskPaneWeb</Id>
+          <Source>https://localhost:3000/taskpane.html</Source>
+        </WebExtension>
+
+        <Ribbon>
+          <CustomTab>
+            <Id>CalcDocRibbon</Id>
+            <Label>CalcDoc</Label>
+            <Group>
+              <Id>CalcDocGroup</Id>
+              <Label>Variables</Label>
+              <Control xsi:type="button">
+                <Id>CalcDocBtn</Id>
+                <Label>Open Panel</Label>
+                <Superscript>false</Superscript>
+                <ControlPropertiesSet>
+                  <Enabled>true</Enabled>
+                  <Visible>true</Visible>
+                </ControlPropertiesSet>
+                <Action xsi:type="ShowTaskPane">
+                  <TaskpaneId>CalcDocTaskPane</TaskpaneId>
+                </Action>
+              </Control>
+            </Group>
+          </CustomTab>
+        </Ribbon>
+      </Host>
+    </Hosts>
+  </VersionOverrides>
+</OfficeApp>
