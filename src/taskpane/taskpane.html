@@ -1,79 +1,107 @@
 <!-- Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT License. -->
 <!-- This file shows how to design a first-run page that provides a welcome screen to the user about the features of the add-in. -->
 
-<!DOCTYPE html>
+<!doctype html>
 <html>
-
-<head>
+  <head>
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Calcs for word frame</title>
 
     <!-- Office JavaScript API -->
-    <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+    <script
+      type="text/javascript"
+      src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"
+    ></script>
+    <!-- Main logic -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.min.js"></script>
+    <script type="text/javascript" src="taskpane.js"></script>
 
     <!-- For more information on Fluent UI, visit https://developer.microsoft.com/fluentui#/. -->
-    <link rel="stylesheet" href="https://res-1.cdn.office.net/files/fabric-cdn-prod_20230815.002/office-ui-fabric-core/11.1.0/css/fabric.min.css"/>
+    <link
+      rel="stylesheet"
+      href="https://res-1.cdn.office.net/files/fabric-cdn-prod_20230815.002/office-ui-fabric-core/11.1.0/css/fabric.min.css"
+    />
 
     <!-- Template styles -->
     <link href="taskpane.css" rel="stylesheet" type="text/css" />
+  </head>
+  <body>
+    <!-- Header -->
+    <div class="header">
+      <h1>Calcs for word 🧑‍💻</h1>
+      <p>Dynamic equation calculator for calculation reports</p>
+    </div>
 
-</head>
+    <!-- Trigger button -->
+    <button class="btnUpdate" id="btnUpdate">📒 Update Whole Document</button>
+    <button class="btnUpdate" id="btnUpdateSelection">🔍 Update Selected Text</button>
 
- <!-- Header -->
-  <div class="header">
-    <h1>Calcs for word 🧑‍💻</h1>
-    <p>Dynamic equation calculator for calculation reports</p>
-  </div>
+    <!-- Status line -->
+    <div id="status">Press <strong>Update</strong> to scan and recalculate.</div>
 
-  <!-- Trigger button -->
-  <button id="btnUpdate">✍️  Update Document</button>
+    <!-- DataFrame preview table -->
+    <div class="table-wrap">
+      <table id="dfTable">
+        <thead>
+          <tr>
+            <th style="width: 48px">Type</th>
+            <th style="width: 72px">Variable</th>
+            <th>Equation</th>
+            <th style="width: 72px">Value</th>
+          </tr>
+        </thead>
+        <tbody id="dfBody">
+          <tr class="empty-row">
+            <td colspan="4">No variables yet – press Update.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
-  <!-- Status line -->
-  <div id="status">Press <strong>Update</strong> to scan and recalculate.</div>
+    <!-- Syntax guide -->
 
-  <!-- DataFrame preview table -->
-  <div class="table-wrap">
-    <table id="dfTable">
-      <thead>
-        <tr>
-          <th style="width:48px">Type</th>
-          <th style="width:72px">Variable</th>
-          <th>Equation</th>
-          <th style="width:72px">Value</th>
-        </tr>
-      </thead>
-      <tbody id="dfBody">
-        <tr class="empty-row"><td colspan="4">No variables yet – press Update.</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <!-- Syntax guide -->
-  <div class="cheat">
-    <h3>📝 Line Syntax</h3>
     <div class="row">
-      <span class="label">Definition:</span>
-      <code>Description: variable = number</code>
+      <!-- Trigger/Open The Modal -->
+      <button class="btnCheat" id="modalBtn">📝 Cheat sheet</button>
     </div>
-    <div class="row">
-      <span class="label">Calculation:</span>
-      <code>Description: result = expression = (auto)</code>
+    <!-- The Modal -->
+    <div id="myModal" class="modal">
+      <!-- Modal content -->
+      <div class="modal-content">
+        <button class="close" aria-label="Close modal">&times;</button>
+
+        <h3>📝 Cheat sheet</h3>
+        <div class="row">
+          <span class="label">Definition:</span>
+          <code>(Optional Description): variable = number (with units)</code>
+        </div>
+        <div class="row">
+          <span class="label">Calculation:</span>
+          <code>(Optional Description): result = expression = (desired units)</code>
+        </div>
+        <div class="row" style="margin-top: 6px; color: #64748b">
+          The final value in a calculation line is written back by the app based on the desired
+          units. Results can be recalculated without removing values.
+        </div>
+        <div class="row" style="margin-top: 6px; color: #64748b">
+          If units are used, these should be specified in the defintions and answer. All typical
+          units are supported.
+        </div>
+        <div class="row" style="margin-top: 6px; color: #64748b">
+          Typical operators are supported but powers should be written as <code>x^2</code> etc. This
+          includes units.
+        </div>
+        <h3>🏺 Greek characters</h3>
+        <div class="row" style="margin-top: 6px; color: #64748b">
+          Need some greek? Copy and paste the symbols from below into the doc:
+        </div>
+        <div class="row">
+          Α α, Β β, Γ γ, Δ δ, Ε ε, Ζ ζ, Η η, Θ θ, Ι ι, Κ κ, Λ λ, Μ μ, Ν ν, Ξ ξ, Ο ο, Π π, Ρ ρ, Σ σ
+          ς, Τ τ, Υ υ, Φ φ, Χ χ, Ψ ψ, Ω ω
+        </div>
+      </div>
     </div>
-    <div class="row" style="margin-top:6px; color:#64748b;">
-      Use <code>:</code> as the field separator.  The final value in a
-      calculation line is written back by CalcDoc.
-    </div>
-  </div>
-
-
-
-  <!-- Main logic -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.min.js"></script>
-<script type="text/javascript" src="taskpane.js"></script>
-
-
-</body>
-
+  </body>
 </html>
