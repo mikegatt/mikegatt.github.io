@@ -68,7 +68,7 @@ async function Excel_or_Word_update() {
       await context.sync();
 
       // Copy text out so we can work with it outside the context
-      resolve(paras.items.map((p) => convertSuperscripts(p.text)));
+      resolve(paras.items.map((p) => p.text));
     }).catch(reject);
   });
   // ── 2.  Parse & classify ─────────────────────────────────────
@@ -134,15 +134,15 @@ async function Excel_or_Word_update() {
     const answer = eqParts[1];
 
     //regex to split value from units
-    const targetunits = answer.replace(/^[-+]?\d+\.?\d*\s*/, "");
-
+    const targetunits = answer.replace(/^[-+]?\d+\.?\d*\s*/, '');
+ 
     // ── Evaluate with math.js (units propagate automatically) ──
     try {
       let result;
-      if (!targetunits == "") {
-        result = math.evaluate(expression + " to " + targetunits, scope);
-      } else {
-        result = math.evaluate(expression, scope);
+      if (!targetunits ==''){
+      result = math.evaluate(expression + " to " + targetunits, scope);
+      }else{
+      result = math.evaluate(expression, scope);
       }
 
       if (isErrorValue(result)) {
@@ -218,7 +218,7 @@ async function Excel_or_Word_update() {
       // Process all paragraphs and queue search operations
       const searchOps = [];
       for (const { range, row } of paraRanges) {
-        const currentText = convertSuperscripts(range.text);
+        const currentText = range.text;
         const m2 = currentText.match(/^(.*)=([^=]*)$/);
         if (!m2) continue;
         const [, beforeLastEquals] = m2;
@@ -244,11 +244,8 @@ async function Excel_or_Word_update() {
             // Clear only the text content, preserving formatting structure
             rangeAfterEquals.clear();
 
-            // Convert back to Unicode superscripts before inserting
-            const textToInsert = convertToSuperscripts(newResultText);
-
             // Insert new text at the start, which inherits formatting from context
-            rangeAfterEquals.insertText(textToInsert, "Start");
+            rangeAfterEquals.insertText(newResultText, "Start");
           }
         }
 
@@ -321,10 +318,6 @@ function clean(str) {
     return null;
   }
 }
-function convertSuperscripts(str) {
-  if (!str) return str;
-  return str.replace(/²/g, "^2").replace(/³/g, "^3").replace(/⁴/g, "^4");
-}
 /**
  * Format a math.js value (Unit or number) for display.
  * Returns a string like "0.18 m^2" or "42" (unitless).
@@ -335,7 +328,7 @@ function formatValue(val) {
   // Check if it's a math.js Unit
   if (math.isUnit && math.isUnit(val)) {
     // Format the unit nicely
-    return convertSuperscripts(val.format({ precision: 2 }));
+    return val.format({ precision: 2 });
   }
 
   // Check if it's a plain number
@@ -347,10 +340,7 @@ function formatValue(val) {
   // Fallback for other types
   return String(val);
 }
-function convertToSuperscripts(str) {
-  if (!str) return str;
-  return str.replace(/\^2/g, "²").replace(/\^3/g, "³").replace(/\^4/g, "⁴");
-}
+
 /**
  * Check if a value represents an error (NaN, null, undefined, or error object).
  */
@@ -369,3 +359,5 @@ math.createUnit({
     prefixes: "short",
   },
 });
+
+
