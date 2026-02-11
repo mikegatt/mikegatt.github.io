@@ -92,13 +92,21 @@ async function Excel_or_Word_update() {
     }
 
     // Yes, so regex to split to before first equals and after
-    const calcLine = paragraphs[i].match(/^([^=]+)=(.+)$/);
-    const lineDefinition = clean(calcLine[1]);
-    const lineResult = clean(calcLine[2]);
+    let calcLine, lineDefinition, lineResult;
+    try {
+      calcLine = paragraphs[i].match(/^([^=]+)=(.+)$/);
+      lineDefinition = clean(calcLine[1]);
+      lineResult = clean(calcLine[2]);
+    } catch (err) {
+      errors.push(
+        `Line ${i + 1}: could not parse "${lineResult}" as an equation. Error: ${err.message}`
+      );
+      continue;
+    }
 
     // See if the defintion includes words as well as a variable
-    if (lineDefinition.includes(":")) {
-      [lineName, lineVar] = lineDefinition.split(":");
+    if (lineDefinition.includes(";")) {
+      [lineName, lineVar] = lineDefinition.split(";");
     } else {
       lineName = null;
       lineVar = lineDefinition;
@@ -179,7 +187,7 @@ async function Excel_or_Word_update() {
         name: lineVar,
         equation: expression,
         value: null,
-        valueStr: "ERROR",
+        valueStr: "ERROR: " + err.message,
         paraIndex: i,
       });
     }
@@ -205,7 +213,7 @@ async function Excel_or_Word_update() {
       const paraRanges = [];
       for (const row of df) {
         if (row.type !== "CALCULATED") continue;
-        if (isErrorValue(row.value)) continue;
+        //if (isErrorValue(row.value)) continue;
         const para = paras.items[row.paraIndex];
         const paraRange = para.getRange();
         paraRange.load("text");
@@ -266,7 +274,7 @@ async function Excel_or_Word_update() {
   // ── 5.  Status ───────────────────────────────────────────────
   if (errors.length > 0) {
     setStatus("Done with " + errors.length + " warning(s):" + errors, "err");
-    console.warn("CalcDoc warnings:", errors);
+    console.warn("Calcs for word warnings:", errors);
   } else if (df.length === 0) {
     setStatus("No definition or calculation lines found.");
   } else {
@@ -335,13 +343,13 @@ function formatValue(val) {
   // Check if it's a math.js Unit
   if (math.isUnit && math.isUnit(val)) {
     // Format the unit nicely
-    return convertSuperscripts(val.format({ precision: 2 }));
+    return convertSuperscripts(val.format({ precision: 5 }));
   }
 
   // Check if it's a plain number
   if (typeof val === "number") {
     if (!isFinite(val)) return "NaN";
-    return String(parseFloat(Number(val).toPrecision(2)));
+    return String(parseFloat(Number(val).toPrecision(5)));
   }
 
   // Fallback for other types
