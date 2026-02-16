@@ -1,75 +1,92 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0" xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="TaskPaneApp">
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1" 
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+           xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0" 
+           xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides" 
+           xsi:type="TaskPaneApp">
   <Id>29364931-c79e-449b-83ac-0bdf877629f5</Id>
   <Version>1.0.0.0</Version>
   <ProviderName>momentumengineering</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Calcs for word"/>
   <Description DefaultValue="Calcs for word"/>
-  <IconUrl DefaultValue="https://localhost:3000/assets/icon-32.png"/>
-  <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/icon-64.png"/>
-  <SupportUrl DefaultValue="https://www.momentumengineering.com/help"/>
+  <IconUrl DefaultValue="https://mikegatt.github.io/assets/icon-32.png"/>
+  <HighResolutionIconUrl DefaultValue="https://mikegatt.github.io/assets/icon-64.png"/>
+  <SupportUrl DefaultValue="https://www.mikegatt.github.io"/>
   <AppDomains>
     <AppDomain>https://www.momentumengineering.com</AppDomain>
+    <AppDomain>https://mikegatt.github.io</AppDomain>
   </AppDomains>
   <Hosts>
     <Host Name="Document"/>
   </Hosts>
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://localhost:3000/taskpane.html"/>
+    <SourceLocation DefaultValue="https://mikegatt.github.io/src/taskpane/taskpane.html"/>
   </DefaultSettings>
   <Permissions>ReadWriteDocument</Permissions>
-  <!-- ===== Host-Specific Requirements ===== -->
-  <VersionOverrides xmlns="http://schemas.microsoft.com/office/2015/06/OfficeExtensions/Manifest" xsi:type="HostAppVersion">
-
-    <!-- ─── Word Desktop / Web ─── -->
+  
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
     <Hosts>
-      <Host xsi:type="document">
-        <HostRequirements>
-          <Requirements>
-            <Sets>
-              <Set Name="TextBinding" MinVersion="1.1" />
-            </Sets>
-          </Requirements>
-        </HostRequirements>
-
+      <Host xsi:type="Workbook">
         <DesktopFormFactor>
-          <ProgId>WD.EXE.16</ProgId>
-          <TaskPaneExtension>
-            <!-- unique ID – keep stable across publishes -->
-            <Id>CalcDocTaskPane</Id>
-            <Source>https://localhost:3000/taskpane.html</Source>
-          </TaskPaneExtension>
+          <GetStarted>
+            <Title resid="GetStarted.Title"/>
+            <Description resid="GetStarted.Description"/>
+            <LearnMoreUrl resid="GetStarted.LearnMoreUrl"/>
+          </GetStarted>
+          <FunctionFile resid="Commands.Url" />
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <OfficeTab id="TabHome">
+              <Group id="CalcDocGroup">
+                <Label resid="CalcDocGroup.Label" />
+                <Icon>
+                  <bt:Image size="16" resid="Icon.16x16"/>
+                  <bt:Image size="32" resid="Icon.32x32"/>
+                  <bt:Image size="80" resid="Icon.80x80"/>
+                </Icon>
+                <Control xsi:type="Button" id="CalcDocBtn">
+                  <Label resid="CalcDocBtn.Label" />
+                  <Supertip>
+                    <Title resid="CalcDocBtn.Label" />
+                    <Description resid="CalcDocBtn.Tooltip" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16x16"/>
+                    <bt:Image size="32" resid="Icon.32x32"/>
+                    <bt:Image size="80" resid="Icon.80x80"/>
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>CalcsforwordTaskPane</TaskpaneId>
+                    <SourceLocation resid="Taskpane.Url"/>
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
         </DesktopFormFactor>
-
-        <WebExtension>
-          <Id>CalcDocTaskPaneWeb</Id>
-          <Source>https://localhost:3000/taskpane.html</Source>
-        </WebExtension>
-
-        <Ribbon>
-          <CustomTab>
-            <Id>CalcDocRibbon</Id>
-            <Label>CalcDoc</Label>
-            <Group>
-              <Id>CalcDocGroup</Id>
-              <Label>Variables</Label>
-              <Control xsi:type="button">
-                <Id>CalcDocBtn</Id>
-                <Label>Open Panel</Label>
-                <Superscript>false</Superscript>
-                <ControlPropertiesSet>
-                  <Enabled>true</Enabled>
-                  <Visible>true</Visible>
-                </ControlPropertiesSet>
-                <Action xsi:type="ShowTaskPane">
-                  <TaskpaneId>CalcDocTaskPane</TaskpaneId>
-                </Action>
-              </Control>
-            </Group>
-          </CustomTab>
-        </Ribbon>
       </Host>
     </Hosts>
+    
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Icon.16x16" DefaultValue="https://mikegatt.github.io/assets/icon-16.png"/>
+        <bt:Image id="Icon.32x32" DefaultValue="https://mikegatt.github.io/assets/icon-32.png"/>
+        <bt:Image id="Icon.80x80" DefaultValue="https://mikegatt.github.io/assets/icon-80.png"/>
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://www.mikegatt.github.io"/>
+        <bt:Url id="Commands.Url" DefaultValue="https://mikegatt.github.io/src/commands/commands.html"/>
+        <bt:Url id="Taskpane.Url" DefaultValue="https://mikegatt.github.io/src/taskpane/taskpane.html"/>
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="GetStarted.Title" DefaultValue="Get started with Calcs for Word"/>
+        <bt:String id="CalcDocGroup.Label" DefaultValue="Variables"/>
+        <bt:String id="CalcDocBtn.Label" DefaultValue="Open Panel"/>
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="GetStarted.Description" DefaultValue="Your add-in loaded successfully."/>
+        <bt:String id="CalcDocBtn.Tooltip" DefaultValue="Click to open the variables panel"/>
+      </bt:LongStrings>
+    </Resources>
   </VersionOverrides>
 </OfficeApp>
