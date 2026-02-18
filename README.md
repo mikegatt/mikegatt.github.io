@@ -12,6 +12,12 @@ The final value in a calculation line in the bit noted (an automatically calcula
 
 Results can be recalculated without removing values.
 
+Variables are held in the memory panel between updates so if only a portion of text is updated using 'Update Selected Text' then this will use any variables stored in the memory panel on the right hand side.
+
+## Precision
+
+If nothing is typed after the final = sign, a default precision will be put in which is probably going to be too specific. To change this, you can suggest a precision. For example, writing x = 5.1233m + 4.11111m = 0.0m will evaluate to 9.2m.
+
 ## Calculation Engine
 
 The app uses the math.js package to evaluate expressions. A full set of supported functions is available here: https://mathjs.org/docs/expressions/syntax.html
