@@ -1,17 +1,18 @@
 // ──────────────────────────────────────────────
 // CalcDoc – Office.js add-in with math.js units
 // ──────────────────────────────────────────────
-var updateSelection;
+var updatePart;
 let df = []; // the "dataframe"
 let scope = {}; // math.js scope: name → Unit or number
 
 Office.onReady(function () {
+  
   document.getElementById("btnUpdate").addEventListener("click", function () {
-    updateSelection = false;
+    updatePart = false;
     runUpdate();
   });
-  document.getElementById("btnUpdateSelection").addEventListener("click", function () {
-    updateSelection = true;
+  document.getElementById("btnupdatePart").addEventListener("click", function () {
+    updatePart = true;
     runUpdate();
   });
 
@@ -73,7 +74,7 @@ async function Excel_or_Word_update() {
 
     // ── 1. Load all paragraph text ───────────────────────────────
     let paras;
-    if (updateSelection == true) {
+    if (updatePart == true) {
       paras = context.document.getSelection().paragraphs;
     } else {
       paras = context.document.paragraphs;
@@ -83,7 +84,7 @@ async function Excel_or_Word_update() {
 
     const rawTexts = paras.items.map((p) => convertSuperscripts(p.text));
 
-    // ── 2. Parse & classify (pure JS, zero Office calls) ─────────
+    // ── 2. Parse & classify ─────────
     for (let i = 0; i < rawTexts.length; i++) {
       if (!rawTexts[i].includes("=")) continue;
 
@@ -144,8 +145,8 @@ async function Excel_or_Word_update() {
         scope[lineVar] = result;
         const formatted = formatValue(result, existingDecimalPlaces);
         const existing  = df.findIndex((e) => e.name === lineVar);
-        const row = { type: "CALCULATED", name: lineVar, equation: lineResult, value: result, valueStr: formatted, paraIndex: i };
-        if (existing !== -1) df[existing] = row; else df.push({ ...row, equation: expression });
+        const row = { type: "CALCULATED", name: lineVar, equation: expression, value: result, valueStr: formatted, paraIndex: i };
+        if (existing !== -1) df[existing] = row; else df.push(row);
       } catch (err) {
         errors.push(`Line ${i + 1} (${lineVar}): expression "${expression}" failed. ${err.message}`);
         df.push({ type: "CALCULATED", name: lineVar, equation: expression, value: null, valueStr: "ERROR: " + err.message, paraIndex: i });
