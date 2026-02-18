@@ -1,18 +1,18 @@
 // ──────────────────────────────────────────────
 // CalcDoc – Office.js add-in with math.js units
 // ──────────────────────────────────────────────
-var updatePart;
+var updateSelection;
 let df = []; // the "dataframe"
 let scope = {}; // math.js scope: name → Unit or number
 
 Office.onReady(function () {
   
   document.getElementById("btnUpdate").addEventListener("click", function () {
-    updatePart = false;
+    updateSelection = false;
     runUpdate();
   });
-  document.getElementById("btnupdatePart").addEventListener("click", function () {
-    updatePart = true;
+  document.getElementById("btnupdateSelection").addEventListener("click", function () {
+    updateSelection = true;
     runUpdate();
   });
 
@@ -74,7 +74,7 @@ async function Excel_or_Word_update() {
 
     // ── 1. Load all paragraph text ───────────────────────────────
     let paras;
-    if (updatePart == true) {
+    if (updateSelection == true) {
       paras = context.document.getSelection().paragraphs;
     } else {
       paras = context.document.paragraphs;
