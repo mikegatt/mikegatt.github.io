@@ -18,12 +18,18 @@ Office.onReady(function () {
   // ─── Modal event listeners ───
   var modal = document.getElementById("myModal");
   var modalBtn = document.getElementById("modalBtn");
+  var clearBtn = document.getElementById("clearBtn");
   var closeBtn = document.getElementsByClassName("close")[0];
 
   modalBtn.onclick = function () {
     modal.style.display = "block";
   };
-
+  clearBtn.onclick = function () {
+    df = [];
+    scope = {};
+    renderTable(df);
+    setStatus('Variables cleared','ok')
+  };
   closeBtn.onclick = function () {
     modal.style.display = "none";
   };
@@ -54,16 +60,7 @@ async function runUpdate() {
 
 /**
  * Main Office.js routine – reads every paragraph, classifies it,
- * evaluates calculations with math.js (preserving units), then writes results back.
- *
- * Sync budget:
- *   Single Word.run with 2 context.sync() calls:
- *     Sync 1 – load all paragraph text                       (read phase)
- *     Sync 2 – flush all insertText mutations                (write phase)
- *
- * The write phase uses paraRange.insertText(newFullText, "Replace") to replace
- * the entire paragraph content in one call. This avoids expandTo() and clear()
- * which are not supported in Word Online.
+ * then immediately searches and replaces the result in the same iteration.
  */
 async function Excel_or_Word_update() {
   const errors = [];
@@ -77,11 +74,13 @@ async function Excel_or_Word_update() {
       paras = context.document.body.paragraphs;
     }
     paras.load("text");
-    await context.sync(); // ← SYNC 1
+    await context.sync(); // ← SYNC 1: read paragraph text
 
     const rawTexts = paras.items.map((p) => convertSuperscripts(p.text));
 
-    // ── 2. Parse & classify ─────────
+    // ── 2. Parse, classify, and queue replacements ───────────
+    const searchOps = [];
+
     for (let i = 0; i < rawTexts.length; i++) {
       if (!rawTexts[i].includes("=")) continue;
 
@@ -103,7 +102,7 @@ async function Excel_or_Word_update() {
         lineVar = lineDefinition;
       }
 
-      // No second '=' → DEFINED variable
+      // ── DEFINED variable (no second '=') ─────────────────────
       if (!lineResult.includes("=")) {
         try {
           const unitValue = math.evaluate(lineResult);
@@ -118,8 +117,11 @@ async function Excel_or_Word_update() {
             valueStr: formatted,
             paraIndex: i,
           };
-          if (existing !== -1) df[existing] = row;
-          else df.push(row);
+          if (existing !== -1) {
+            df[existing] = row;
+          } else {
+            df.push(row);
+          }
         } catch (err) {
           errors.push(
             `Line ${i + 1}: could not parse "${lineResult}" as a unit or number. Error: ${err.message}`
@@ -128,16 +130,19 @@ async function Excel_or_Word_update() {
         continue;
       }
 
-      // Has a second '=' → CALCULATED line
+      // ── CALCULATED line (has a second '=') ───────────────────
       const eqParts = lineResult.split("=");
       const expression = eqParts[0];
       const answer = eqParts[1];
       const targetunits = answer.replace(/^[-+]?\d+\.?\d*\s*/, "");
       const existingDecimalPlaces = countDecimalPlaces(answer);
 
+      let newValueStr;
+      let calcResult = null;
+
       try {
         let result;
-        if (targetunits !== "") {
+        if (targetunits !== "" && targetunits.slice(0,5) != 'ERROR') {
           result = math.evaluate(expression + " to " + targetunits, scope);
         } else {
           result = math.evaluate(expression, scope);
@@ -147,79 +152,55 @@ async function Excel_or_Word_update() {
           errors.push(
             `Line ${i + 1} (${lineVar}): expression "${expression}" evaluated to an error.`
           );
-          df.push({
-            type: "CALCULATED",
-            name: lineVar,
-            equation: expression,
-            value: null,
-            valueStr: "ERROR",
-            paraIndex: i,
-          });
-          continue;
+          newValueStr = "ERROR";
+        } else {
+          scope[lineVar] = result;
+          calcResult = result;
+          newValueStr = formatValue(result, existingDecimalPlaces);
         }
-
-        scope[lineVar] = result;
-        const formatted = formatValue(result, existingDecimalPlaces);
-        const existing = df.findIndex((e) => e.name === lineVar);
-        const row = {
-          type: "CALCULATED",
-          name: lineVar,
-          equation: expression,
-          value: result,
-          valueStr: formatted,
-          paraIndex: i,
-        };
-        if (existing !== -1) df[existing] = row;
-        else df.push(row);
       } catch (err) {
         errors.push(
           `Line ${i + 1} (${lineVar}): expression "${expression}" failed. ${err.message}`
         );
-        df.push({
-          type: "CALCULATED",
-          name: lineVar,
-          equation: expression,
-          value: null,
-          valueStr: "ERROR: " + err.message,
-          paraIndex: i,
-        });
+        newValueStr = "ERROR: " + err.message;
       }
-    }
 
-    // ── 3. Queue search() for every paragraph that needs updating ─
-    // All search() calls are issued here — before any sync — so they
-    // are batched into a single round-trip by context.sync().
-    const searchOps = [];
-    for (const row of df) {
-      if (row.type !== "CALCULATED") continue;
-      let m2;
-      const rawText = rawTexts[row.paraIndex];
-      try {
-        m2 = rawText.match(/^(.*)=([^=]*)$/);
-      } catch (e) {
-        continue;
+      // Store / update the dataframe row
+      const existing = df.findIndex((e) => e.name === lineVar);
+      const row = {
+        type: "CALCULATED",
+        name: lineVar,
+        equation: expression,
+        value: calcResult,
+        valueStr: newValueStr,
+        paraIndex: i,
+      };
+      if (existing !== -1) {
+        df[existing] = row;
+      } else {
+        df.push(row);
       }
+
+      // Queue a search() for this line if the document text needs updating
+      const m2 = rawTexts[i].match(/^(.*)=([^=]*)$/);
       if (!m2) continue;
       const [, beforeLastEquals] = m2;
-
-      // Skip if the value hasn't changed
-      if (clean(rawText) === clean(beforeLastEquals + "=" + row.valueStr)) continue;
+      if (clean(rawTexts[i]) === clean(beforeLastEquals + "=" + newValueStr)) continue;
 
       try {
-        const paraRange = paras.items[row.paraIndex].getRange("Whole");
+        const paraRange = paras.items[i].getRange("Whole");
         const searchResults = paraRange.search("=", { matchCase: true });
         searchResults.load("items");
-        searchOps.push({ searchResults, newResultText: row.valueStr, paraRange });
+        searchOps.push({ searchResults, newResultText: newValueStr, paraRange });
       } catch (e) {
-        errors.push(`Search error on line ${row.paraIndex + 1}: ${e.message}`);
+        errors.push(`Search error on line ${i + 1}: ${e.message}`);
       }
     }
 
     // Resolve all searches in one shot
     if (searchOps.length > 0) {
-      await context.sync(); // ← SYNC 2
+      await context.sync(); // ← SYNC 2: resolve all searches
 
-      // ── 4. Queue all replacements (no more syncs until the final one) ──
       for (const { searchResults, newResultText, paraRange } of searchOps) {
         if (searchResults.items.length === 0) continue;
         const lastEquals = searchResults.items[searchResults.items.length - 1];
@@ -237,7 +218,7 @@ async function Excel_or_Word_update() {
 
   // ── 5. Status ────────────────────────────────────────────────
   if (errors.length > 0) {
-    setStatus("Done with " + errors.length + " warning(s): " + errors.join("; "), "err");
+    setStatus("Done with " + errors.length + " warning(s)", "err");
     console.warn("Calcs for word warnings:", errors);
   } else if (df.length === 0) {
     setStatus("No definition or calculation lines found.");
@@ -254,7 +235,7 @@ function renderTable(df) {
 
   if (df.length === 0) {
     tbody.innerHTML =
-      '<tr class="empty-row"><td colspan="4">No variables found in this document.</td></tr>';
+      '<tr class="empty-row"><td colspan="3">No variables found in this document.</td></tr>';
     return;
   }
 
@@ -264,7 +245,6 @@ function renderTable(df) {
     const valClass = "col-val" + (row.valueStr === "ERROR" ? " nan" : "");
 
     tr.innerHTML =
-      `<td class="col-type">${row.type === "DEFINED" ? "DEF" : "CALC"}</td>` +
       `<td class="col-name">${escapeHtml(row.name)}</td>` +
       `<td class="col-eq">${escapeHtml(row.equation)}</td>` +
       `<td class="${valClass}">${escapeHtml(row.valueStr)}</td>`;
