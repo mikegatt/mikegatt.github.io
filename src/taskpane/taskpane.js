@@ -6,7 +6,6 @@ let df = []; // the "dataframe"
 let scope = {}; // math.js scope: name → Unit or number
 
 Office.onReady(function () {
-  
   document.getElementById("btnUpdate").addEventListener("click", function () {
     updateSelection = false;
     runUpdate();
@@ -70,13 +69,12 @@ async function Excel_or_Word_update() {
   const errors = [];
 
   await Word.run(async function (context) {
-
     // ── 1. Load all paragraph text ───────────────────────────────
     let paras;
     if (updateSelection == true) {
       paras = context.document.getSelection().paragraphs;
     } else {
-      paras = context.document.paragraphs;
+      paras = context.document.body.paragraphs;
     }
     paras.load("text");
     await context.sync(); // ← SYNC 1
@@ -112,18 +110,28 @@ async function Excel_or_Word_update() {
           scope[lineVar] = unitValue;
           const formatted = formatValue(unitValue);
           const existing = df.findIndex((e) => e.name === lineVar);
-          const row = { type: "DEFINED", name: lineVar, equation: lineResult, value: unitValue, valueStr: formatted, paraIndex: i };
-          if (existing !== -1) df[existing] = row; else df.push(row);
+          const row = {
+            type: "DEFINED",
+            name: lineVar,
+            equation: lineResult,
+            value: unitValue,
+            valueStr: formatted,
+            paraIndex: i,
+          };
+          if (existing !== -1) df[existing] = row;
+          else df.push(row);
         } catch (err) {
-          errors.push(`Line ${i + 1}: could not parse "${lineResult}" as a unit or number. Error: ${err.message}`);
+          errors.push(
+            `Line ${i + 1}: could not parse "${lineResult}" as a unit or number. Error: ${err.message}`
+          );
         }
         continue;
       }
 
       // Has a second '=' → CALCULATED line
-      const eqParts  = lineResult.split("=");
+      const eqParts = lineResult.split("=");
       const expression = eqParts[0];
-      const answer     = eqParts[1];
+      const answer = eqParts[1];
       const targetunits = answer.replace(/^[-+]?\d+\.?\d*\s*/, "");
       const existingDecimalPlaces = countDecimalPlaces(answer);
 
@@ -136,19 +144,45 @@ async function Excel_or_Word_update() {
         }
 
         if (isErrorValue(result)) {
-          errors.push(`Line ${i + 1} (${lineVar}): expression "${expression}" evaluated to an error.`);
-          df.push({ type: "CALCULATED", name: lineVar, equation: expression, value: null, valueStr: "ERROR", paraIndex: i });
+          errors.push(
+            `Line ${i + 1} (${lineVar}): expression "${expression}" evaluated to an error.`
+          );
+          df.push({
+            type: "CALCULATED",
+            name: lineVar,
+            equation: expression,
+            value: null,
+            valueStr: "ERROR",
+            paraIndex: i,
+          });
           continue;
         }
 
         scope[lineVar] = result;
         const formatted = formatValue(result, existingDecimalPlaces);
-        const existing  = df.findIndex((e) => e.name === lineVar);
-        const row = { type: "CALCULATED", name: lineVar, equation: expression, value: result, valueStr: formatted, paraIndex: i };
-        if (existing !== -1) df[existing] = row; else df.push(row);
+        const existing = df.findIndex((e) => e.name === lineVar);
+        const row = {
+          type: "CALCULATED",
+          name: lineVar,
+          equation: expression,
+          value: result,
+          valueStr: formatted,
+          paraIndex: i,
+        };
+        if (existing !== -1) df[existing] = row;
+        else df.push(row);
       } catch (err) {
-        errors.push(`Line ${i + 1} (${lineVar}): expression "${expression}" failed. ${err.message}`);
-        df.push({ type: "CALCULATED", name: lineVar, equation: expression, value: null, valueStr: "ERROR: " + err.message, paraIndex: i });
+        errors.push(
+          `Line ${i + 1} (${lineVar}): expression "${expression}" failed. ${err.message}`
+        );
+        df.push({
+          type: "CALCULATED",
+          name: lineVar,
+          equation: expression,
+          value: null,
+          valueStr: "ERROR: " + err.message,
+          paraIndex: i,
+        });
       }
     }
 
@@ -162,9 +196,14 @@ async function Excel_or_Word_update() {
       if (row.type !== "CALCULATED") continue;
 
       const rawText = rawTexts[row.paraIndex];
+      let m2;
 
       // Extract everything up to and including the last '='
-      const m2 = rawText.match(/^(.*)=([^=]*)$/);
+      try {
+        m2 = rawText.match(/^(.*)=([^=]*)$/);
+      } catch (e) {
+        continue;
+      }
       if (!m2) continue;
       const beforeLastEquals = m2[1]; // text before the final '='
 
@@ -283,9 +322,10 @@ function formatValue(val, decimalPlaces) {
   // Check if it's a math.js Unit
   if (math.isUnit && math.isUnit(val)) {
     // Get the numeric magnitude and unit string separately
-    const numericPart = val.toNumber();           // magnitude in current unit
-    const unitStr = val.format({ precision: 15 }) // e.g. "3.14159265 m^2"
-      .replace(/^[-+]?\d+\.?\d*\s*/, "")         // strip the number, keep unit
+    const numericPart = val.toNumber(); // magnitude in current unit
+    const unitStr = val
+      .format({ precision: 15 }) // e.g. "3.14159265 m^2"
+      .replace(/^[-+]?\d+\.?\d*\s*/, "") // strip the number, keep unit
       .trim();
 
     let numStr;
