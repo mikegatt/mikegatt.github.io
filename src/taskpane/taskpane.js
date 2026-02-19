@@ -186,45 +186,49 @@ async function Excel_or_Word_update() {
       }
     }
 
-    // ── 3. Queue all paragraph replacements ──────────────────────
-    // For each CALCULATED row that needs updating, replace the entire
-    // paragraph text in one insertText call. This uses only well-supported
-    // Word Online APIs — no expandTo(), clear(), or search() needed.
-    let writeCount = 0;
-
+    // ── 3. Queue search() for every paragraph that needs updating ─
+    // All search() calls are issued here — before any sync — so they
+    // are batched into a single round-trip by context.sync().
+    const searchOps = [];
     for (const row of df) {
       if (row.type !== "CALCULATED") continue;
-
-      const rawText = rawTexts[row.paraIndex];
       let m2;
-
-      // Extract everything up to and including the last '='
+      const rawText = rawTexts[row.paraIndex];
       try {
         m2 = rawText.match(/^(.*)=([^=]*)$/);
       } catch (e) {
         continue;
       }
       if (!m2) continue;
-      const beforeLastEquals = m2[1]; // text before the final '='
+      const [, beforeLastEquals] = m2;
 
       // Skip if the value hasn't changed
       if (clean(rawText) === clean(beforeLastEquals + "=" + row.valueStr)) continue;
 
-      // Build the full replacement text, restoring superscripts
-      const newFullText = convertToSuperscripts(beforeLastEquals + "=" + row.valueStr);
-
       try {
         const paraRange = paras.items[row.paraIndex].getRange("Whole");
-        paraRange.insertText(newFullText, "Replace");
-        writeCount++;
+        const searchResults = paraRange.search("=", { matchCase: true });
+        searchResults.load("items");
+        searchOps.push({ searchResults, newResultText: row.valueStr, paraRange });
       } catch (e) {
-        errors.push(`Write error on line ${row.paraIndex + 1}: ${e.message}`);
+        errors.push(`Search error on line ${row.paraIndex + 1}: ${e.message}`);
       }
     }
 
-    // Flush all replacements in one sync
-    if (writeCount > 0) {
+    // Resolve all searches in one shot
+    if (searchOps.length > 0) {
       await context.sync(); // ← SYNC 2
+
+      // ── 4. Queue all replacements (no more syncs until the final one) ──
+      for (const { searchResults, newResultText, paraRange } of searchOps) {
+        if (searchResults.items.length === 0) continue;
+        const lastEquals = searchResults.items[searchResults.items.length - 1];
+        const rangeAfterEquals = lastEquals.getRange("After").expandTo(paraRange.getRange("End"));
+        rangeAfterEquals.clear();
+        rangeAfterEquals.insertText(convertToSuperscripts(newResultText), "Start");
+      }
+
+      await context.sync(); // ← SYNC 3: write all results
     }
   });
 
