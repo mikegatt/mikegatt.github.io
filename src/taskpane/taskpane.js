@@ -11,7 +11,7 @@ Office.onReady(function () {
     updateSelection = false;
     runUpdate();
   });
-  document.getElementById("btnupdateSelection").addEventListener("click", function () {
+  document.getElementById("btnUpdateSelection").addEventListener("click", function () {
     updateSelection = true;
     runUpdate();
   });
@@ -57,15 +57,14 @@ async function runUpdate() {
  * Main Office.js routine – reads every paragraph, classifies it,
  * evaluates calculations with math.js (preserving units), then writes results back.
  *
- * Sync budget (reduced from original 4 syncs across 2 Word.run calls):
- *   Single Word.run with 3 context.sync() calls:
+ * Sync budget:
+ *   Single Word.run with 2 context.sync() calls:
  *     Sync 1 – load all paragraph text                       (read phase)
- *     Sync 2 – resolve all batched search() results          (search phase)
- *     Sync 3 – flush all insertText mutations                (write phase)
+ *     Sync 2 – flush all insertText mutations                (write phase)
  *
- * The two Word.run contexts from the original have been merged into one,
- * eliminating an entire round-trip and the intermediate para.load("text")
- * sync that was previously needed to re-read paragraphs in the second context.
+ * The write phase uses paraRange.insertText(newFullText, "Replace") to replace
+ * the entire paragraph content in one call. This avoids expandTo() and clear()
+ * which are not supported in Word Online.
  */
 async function Excel_or_Word_update() {
   const errors = [];
@@ -153,52 +152,47 @@ async function Excel_or_Word_update() {
       }
     }
 
-    // ── 3. Queue search() for every paragraph that needs updating ─
-    // All search() calls are issued here — before any sync — so they
-    // are batched into a single round-trip by context.sync().
-    const searchOps = [];
+    // ── 3. Queue all paragraph replacements ──────────────────────
+    // For each CALCULATED row that needs updating, replace the entire
+    // paragraph text in one insertText call. This uses only well-supported
+    // Word Online APIs — no expandTo(), clear(), or search() needed.
+    let writeCount = 0;
+
     for (const row of df) {
       if (row.type !== "CALCULATED") continue;
 
       const rawText = rawTexts[row.paraIndex];
+
+      // Extract everything up to and including the last '='
       const m2 = rawText.match(/^(.*)=([^=]*)$/);
       if (!m2) continue;
-      const [, beforeLastEquals] = m2;
+      const beforeLastEquals = m2[1]; // text before the final '='
 
       // Skip if the value hasn't changed
       if (clean(rawText) === clean(beforeLastEquals + "=" + row.valueStr)) continue;
 
+      // Build the full replacement text, restoring superscripts
+      const newFullText = convertToSuperscripts(beforeLastEquals + "=" + row.valueStr);
+
       try {
         const paraRange = paras.items[row.paraIndex].getRange("Whole");
-        const searchResults = paraRange.search("=", { matchCase: true });
-        searchResults.load("items");
-        searchOps.push({ searchResults, newResultText: row.valueStr, paraRange });
+        paraRange.insertText(newFullText, "Replace");
+        writeCount++;
       } catch (e) {
-        errors.push(`Search error on line ${row.paraIndex + 1}: ${e.message}`);
+        errors.push(`Write error on line ${row.paraIndex + 1}: ${e.message}`);
       }
     }
 
-    // Resolve all searches in one shot
-    if (searchOps.length > 0) {
+    // Flush all replacements in one sync
+    if (writeCount > 0) {
       await context.sync(); // ← SYNC 2
-
-      // ── 4. Queue all replacements (no more syncs until the final one) ──
-      for (const { searchResults, newResultText, paraRange } of searchOps) {
-        if (searchResults.items.length === 0) continue;
-        const lastEquals = searchResults.items[searchResults.items.length - 1];
-        const rangeAfterEquals = lastEquals.getRange("After").expandTo(paraRange.getRange("End"));
-        rangeAfterEquals.clear();
-        rangeAfterEquals.insertText(convertToSuperscripts(newResultText), "Start");
-      }
-
-      await context.sync(); // ← SYNC 3: write all results
     }
   });
 
-  // ── 5. Render the dataframe table ────────────────────────────
+  // ── 4. Render the dataframe table ────────────────────────────
   renderTable(df);
 
-  // ── 6. Status ────────────────────────────────────────────────
+  // ── 5. Status ────────────────────────────────────────────────
   if (errors.length > 0) {
     setStatus("Done with " + errors.length + " warning(s): " + errors.join("; "), "err");
     console.warn("Calcs for word warnings:", errors);
