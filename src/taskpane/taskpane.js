@@ -1,55 +1,116 @@
 // ──────────────────────────────────────────────
-// CalcDoc – Office.js add-in with math.js units
+// Calcs for word – Office.js add-in with math.js units
 // ──────────────────────────────────────────────
-var updateSelection;
+
 let df = []; // the "dataframe"
 let scope = {}; // math.js scope: name → Unit or number
+const characters = [
+  "Α",
+  "α",
+  "Β",
+  "β",
+  "Γ",
+  "γ",
+  "Δ",
+  "δ",
+  "Ε",
+  "ε",
+  "Ζ",
+  "ζ",
+  "Η",
+  "η",
+  "Θ",
+  "θ",
+  "Ι",
+  "ι",
+  "Κ",
+  "κ",
+  "Λ",
+  "λ",
+  "Μ",
+  "μ",
+  "Ν",
+  "ν",
+  "Ξ",
+  "ξ",
+  "Ο",
+  "ο",
+  "Π",
+  "π",
+  "Ρ",
+  "ρ",
+  "Σ",
+  "σ",
+  "ς",
+  "Τ",
+  "τ",
+  "Υ",
+  "υ",
+  "Φ",
+  "φ",
+  "Χ",
+  "χ",
+  "Ψ",
+  "ψ",
+  "Ω",
+  "ω",
+];
+const powers = ["²", "³", "⁴", "⁶"];
 
 Office.onReady(function () {
-  document.getElementById("btnUpdate").addEventListener("click", function () {
-    updateSelection = false;
-    runUpdate();
-  });
-  document.getElementById("btnUpdateSelection").addEventListener("click", function () {
-    updateSelection = true;
-    runUpdate();
-  });
-
-  // ─── Modal event listeners ───
-  var modal = document.getElementById("myModal");
-  var modalBtn = document.getElementById("modalBtn");
-  var clearBtn = document.getElementById("clearBtn");
-  var closeBtn = document.getElementsByClassName("close")[0];
-
-  modalBtn.onclick = function () {
-    modal.style.display = "block";
+  document.getElementById("btnUpdate").onclick = function () {
+    runUpdate(false);
   };
-  clearBtn.onclick = function () {
+  document.getElementById("btnUpdateSelection").onclick = function () {
+    runUpdate(true);
+  };
+  document.getElementById("clearBtn").onclick = function () {
     df = [];
     scope = {};
     renderTable(df);
-    setStatus('Variables cleared','ok')
+    setStatus("Variables cleared", "ok");
   };
-  closeBtn.onclick = function () {
+  var modal = document.getElementById("myModal");
+  document.getElementById("modalBtn").onclick = function () {
+    modal.style.display = "block";
+  };
+  document.getElementsByClassName("close")[0].onclick = function () {
     modal.style.display = "none";
   };
-
   window.onclick = function (event) {
     if (event.target == modal) {
       modal.style.display = "none";
     }
   };
+  const grid = document.getElementById("character-grid");
+  grid.innerHTML = ""; // Clear existing buttons first
+  characters.forEach((char) => {
+    const btn = document.createElement("button");
+    btn.textContent = char;
+    btn.classList.add("character-btn");
+    btn.addEventListener("click", () => insertCharacterToDocument(char, modal));
+    document.getElementById("character-grid").appendChild(btn);
+  });
+  const powgrid = document.getElementById("power-grid");
+  powgrid.innerHTML = ""; // Clear existing buttons first
+  powers.forEach((pow) => {
+    const powbtn = document.createElement("button");
+    powbtn.textContent = pow;
+    powbtn.classList.add("character-btn");
+    powbtn.addEventListener("click", () => insertCharacterToDocument(pow, modal));
+    document.getElementById("power-grid").appendChild(powbtn);
+  });
 });
 
 // ─── Core update routine ─────────────────────
 
-async function runUpdate() {
+async function runUpdate(updateSelection) {
   const btn = document.getElementById("btnUpdate");
   btn.disabled = true;
   setStatus("Scanning document …");
 
   try {
-    await Excel_or_Word_update(); // Office.js word call
+    await Excel_or_Word_update(updateSelection); // Office.js word call
   } catch (e) {
     setStatus("Error: " + e.message, "err");
     console.error(e);
@@ -62,7 +123,7 @@ async function runUpdate() {
  * Main Office.js routine – reads every paragraph, classifies it,
  * then immediately searches and replaces the result in the same iteration.
  */
-async function Excel_or_Word_update() {
+async function Excel_or_Word_update(updateSelection) {
   const errors = [];
 
   await Word.run(async function (context) {
@@ -84,116 +145,115 @@ async function Excel_or_Word_update() {
     for (let i = 0; i < rawTexts.length; i++) {
       if (!rawTexts[i].includes("=")) continue;
 
-      let calcLine, lineDefinition, lineResult;
-      try {
-        calcLine = rawTexts[i].match(/^([^=]+)=(.+)$/);
-        lineDefinition = clean(calcLine[1]);
-        lineResult = clean(calcLine[2]);
-      } catch (err) {
-        errors.push(`Line ${i + 1}: could not parse as an equation. Error: ${err.message}`);
-        continue;
-      }
+      // ── Discard lineName via ';' split first ─────────────────
+      const rawLine = rawTexts[i].includes(";")
+        ? clean(rawTexts[i].split(";")[1])
+        : clean(rawTexts[i]);
 
-      let lineName, lineVar;
-      if (lineDefinition.includes(";")) {
-        [lineName, lineVar] = lineDefinition.split(";");
-      } else {
-        lineName = null;
-        lineVar = lineDefinition;
-      }
+      // ── Split on '=' and branch on part count ────────────────
+      typeSwitch = /[/*\-+]/.test(rawLine) ? "CALCULATED" : "DEFINED";
+      let row = null;
 
-      // ── DEFINED variable (no second '=') ─────────────────────
-      if (!lineResult.includes("=")) {
-        try {
-          const unitValue = math.evaluate(lineResult);
-          scope[lineVar] = unitValue;
-          const formatted = formatValue(unitValue);
-          const existing = df.findIndex((e) => e.name === lineVar);
-          const row = {
-            type: "DEFINED",
+      switch (typeSwitch) {
+        // ── DEFINED variable (exactly one '=') ─────────────────
+        case "DEFINED": {
+          const [lineVar, lineResult] = rawLine.split("=");
+          try {
+            const unitValue = math.evaluate(lineResult);
+            scope[lineVar] = unitValue;
+            row = {
+              name: lineVar,
+              equation: lineResult,
+              value: unitValue,
+              valueStr: formatValue(unitValue),
+              paraIndex: i,
+            };
+          } catch (err) {
+            errors.push(
+              `Line ${i + 1}: could not parse "${lineResult}" as a unit or number. Error: ${err.message}`
+            );
+          }
+          break;
+        }
+
+        // ── CALCULATED line (exactly two '=') ──────────────────
+        case "CALCULATED": {
+          let lineVar, expression, answer, targetunits, existingDecimalPlaces;
+          targetunits = "";
+          const parts = rawLine.split("=");
+          parts.length == 3
+            ? ([lineVar, expression, answer] = parts)
+            : ([expression, answer] = parts);
+          if (answer.slice(0, 5) !== "ERROR" && answer !== "") {
+            answer = clean(answer);
+            targetunits = answer.replace(/^[-+]?\d+\.?\d*\s*/, "");
+            existingDecimalPlaces = countDecimalPlaces(answer);
+          } else {
+            answer = "";
+          }
+
+          let newValueStr;
+          let calcResult = null;
+
+          try {
+            const result =
+              targetunits !== ""
+                ? math.evaluate(expression + " to " + targetunits, scope)
+                : math.evaluate(expression, scope);
+
+            if (isErrorValue(result)) {
+              errors.push(
+                `Line ${i + 1} (${lineVar}): expression "${expression}" evaluated to an error.`
+              );
+              newValueStr = "ERROR";
+            } else {
+              scope[lineVar] = result;
+              calcResult = result;
+              newValueStr = formatValue(result, existingDecimalPlaces);
+            }
+          } catch (err) {
+            errors.push(
+              `Line ${i + 1} (${lineVar}): expression "${expression}" failed. ${err.message}`
+            );
+            newValueStr = "ERROR: " + err.message;
+          }
+
+          row = {
             name: lineVar,
-            equation: lineResult,
-            value: unitValue,
-            valueStr: formatted,
+            equation: expression,
+            value: calcResult,
+            valueStr: newValueStr,
             paraIndex: i,
           };
-          if (existing !== -1) {
-            df[existing] = row;
-          } else {
-            df.push(row);
+
+          // Queue a search() for this line if the document text needs updating
+          const m2 = rawLine.match(/^(.*)=([^=]*)$/);
+          if (!m2) break;
+          const [, beforeLastEquals] = m2;
+          if (clean(rawLine) === clean(beforeLastEquals + "=" + newValueStr)) break;
+          try {
+            const paraRange = paras.items[i].getRange("Whole");
+            const searchResults = paraRange.search("=", { matchCase: true });
+            searchResults.load("items");
+            searchOps.push({ searchResults, newResultText: newValueStr, paraRange });
+          } catch (e) {
+            errors.push(`Search error on line ${i + 1}: ${e.message}`);
           }
-        } catch (err) {
-          errors.push(
-            `Line ${i + 1}: could not parse "${lineResult}" as a unit or number. Error: ${err.message}`
-          );
-        }
-        continue;
-      }
-
-      // ── CALCULATED line (has a second '=') ───────────────────
-      const eqParts = lineResult.split("=");
-      const expression = eqParts[0];
-      const answer = eqParts[1];
-      const targetunits = answer.replace(/^[-+]?\d+\.?\d*\s*/, "");
-      const existingDecimalPlaces = countDecimalPlaces(answer);
-
-      let newValueStr;
-      let calcResult = null;
-
-      try {
-        let result;
-        if (targetunits !== "" && targetunits.slice(0,5) != 'ERROR') {
-          result = math.evaluate(expression + " to " + targetunits, scope);
-        } else {
-          result = math.evaluate(expression, scope);
+          break;
         }
 
-        if (isErrorValue(result)) {
-          errors.push(
-            `Line ${i + 1} (${lineVar}): expression "${expression}" evaluated to an error.`
-          );
-          newValueStr = "ERROR";
-        } else {
-          scope[lineVar] = result;
-          calcResult = result;
-          newValueStr = formatValue(result, existingDecimalPlaces);
+        // ── Unexpected format ───────────────────────────────────
+        default: {
+          errors.push(`Line ${i + 1}: unexpected number of '=' signs (${parts.length - 1}).`);
+          break;
         }
-      } catch (err) {
-        errors.push(
-          `Line ${i + 1} (${lineVar}): expression "${expression}" failed. ${err.message}`
-        );
-        newValueStr = "ERROR: " + err.message;
       }
 
-      // Store / update the dataframe row
-      const existing = df.findIndex((e) => e.name === lineVar);
-      const row = {
-        type: "CALCULATED",
-        name: lineVar,
-        equation: expression,
-        value: calcResult,
-        valueStr: newValueStr,
-        paraIndex: i,
-      };
-      if (existing !== -1) {
-        df[existing] = row;
-      } else {
-        df.push(row);
-      }
-
-      // Queue a search() for this line if the document text needs updating
-      const m2 = rawTexts[i].match(/^(.*)=([^=]*)$/);
-      if (!m2) continue;
-      const [, beforeLastEquals] = m2;
-      if (clean(rawTexts[i]) === clean(beforeLastEquals + "=" + newValueStr)) continue;
-
-      try {
-        const paraRange = paras.items[i].getRange("Whole");
-        const searchResults = paraRange.search("=", { matchCase: true });
-        searchResults.load("items");
-        searchOps.push({ searchResults, newResultText: newValueStr, paraRange });
-      } catch (e) {
-        errors.push(`Search error on line ${i + 1}: ${e.message}`);
+      // ── Store / update the dataframe row ─────────────────────
+      if (row) {
+        const existing = df.findIndex((e) => e.name === row.name);
+        if (existing !== -1) df[existing] = row;
+        else df.push(row);
       }
     }
 
@@ -220,10 +280,18 @@ async function Excel_or_Word_update() {
   if (errors.length > 0) {
     setStatus("Done with " + errors.length + " warning(s)", "err");
     console.warn("Calcs for word warnings:", errors);
+    const el = document.getElementById("bad-flash-overlay");
+    el.classList.remove("flash-active");
+    void el.offsetWidth; // force reflow
+    el.classList.add("flash-active");
   } else if (df.length === 0) {
     setStatus("No definition or calculation lines found.");
   } else {
     setStatus("✓  Updated " + df.length + " variable(s) successfully.", "ok");
+    const el = document.getElementById("ok-flash-overlay");
+    el.classList.remove("flash-active");
+    void el.offsetWidth; // force reflow
+    el.classList.add("flash-active");
   }
 }
 
@@ -252,6 +320,23 @@ function renderTable(df) {
     tbody.appendChild(tr);
   }
 }
+// ─── Insert character ─────────────────────────────────────────
+async function insertCharacterToDocument(character, modal) {
+  try {
+    await Word.run(async (context) => {
+      // Get the current selection (cursor position)
+      const selection = context.document.getSelection();
+
+      // Insert the character at the cursor, replacing any selected text
+      selection.insertText(character, Word.InsertLocation.replace);
+
+      await context.sync();
+    });
+  } catch (error) {
+    console.error("Error inserting character:", error);
+  }
+  modal.style.display = "none";
+}
 
 // ─── Utility ─────────────────────────────────────────────────
 
@@ -275,7 +360,7 @@ function clean(str) {
 }
 function convertSuperscripts(str) {
   if (!str) return str;
-  return str.replace(/²/g, "^2").replace(/³/g, "^3").replace(/⁴/g, "^4");
+  return str.replace(/²/g, "^2").replace(/³/g, "^3").replace(/⁴/g, "^4").replace(/⁶/g, "^6");
 }
 /**
  * Count the number of decimal places in the numeric part of an answer string.
@@ -337,7 +422,7 @@ function formatValue(val, decimalPlaces) {
 }
 function convertToSuperscripts(str) {
   if (!str) return str;
-  return str.replace(/\^2/g, "²").replace(/\^3/g, "³").replace(/\^4/g, "⁴");
+  return str.replace(/\^2/g, "²").replace(/\^3/g, "³").replace(/\^4/g, "⁴").replace(/\^6/g, "⁶");
 }
 /**
  * Check if a value represents an error (NaN, null, undefined, or error object).

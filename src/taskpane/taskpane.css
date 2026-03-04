@@ -41,7 +41,33 @@ body {
   color: #64748b;
   margin-top: 2px;
 }
-
+/* ─── Flash overlay ─── */
+#ok-flash-overlay {
+  position: fixed; inset: 0;
+  background: #076900;
+  pointer-events: none;
+  opacity: 0; z-index: 9999;
+}
+#ok-flash-overlay.flash-active {
+  animation: greenFlash 600ms ease-out forwards;
+}
+@keyframes greenFlash {
+  0%   { opacity: 0.85; }
+  100% { opacity: 0; }
+}
+#bad-flash-overlay {
+  position: fixed; inset: 0;
+  background: #7a0000;
+  pointer-events: none;
+  opacity: 0; z-index: 9999;
+}
+#bad-flash-overlay.flash-active {
+  animation: greenFlash 600ms ease-out forwards;
+}
+@keyframes greenFlash {
+  0%   { opacity: 0.85; }
+  100% { opacity: 0; }
+}
 /* ─── Update button ─── */
 .btnUpdate {
   width: 100%;
@@ -247,7 +273,13 @@ tbody td:last-child {
   overflow: auto; /* Enable scroll if needed */
   background-color: rgba(0, 0, 0, 0.4); /* Black w/ opacity */
 }
-
+/* Character button */
+.character-btn {
+  font-size: 1.5rem;
+  padding: 0.1rem 0.1rem;
+  cursor: pointer;
+    color: #475569;
+}
 /* Modal Content/Box */
 .modal-content {
   background-color: #fefefe;
