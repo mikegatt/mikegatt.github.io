@@ -6,7 +6,7 @@ The app only operates on a line where an '=' is present. There are two ways it h
 
 Definition: (Optional text description can be here); variable = number (with units if appropriate)
 
-Calculation: (Optional text description can be here); result = expression = (an automatically calculated answer)
+Calculation: (Optional text description can be here); (optional result variable) = expression = (an automatically calculated answer)
 
 The final value in a calculation line in the bit noted (an automatically calculated answer) above is written back by the app.
 
@@ -22,11 +22,13 @@ If nothing is typed after the final = sign, a default precision will be put in w
 
 The app uses the math.js package to evaluate expressions. A full set of supported functions is available here: https://mathjs.org/docs/expressions/syntax.html
 
+Conditional statements are in the format of shorthand javascript ternary statements. For example, writing x = 5 > 3 ? 10 : 20 will evaluate to 10.
+
 ## Unit handling
 
 The app uses the math.js package for unit handling. A full set of supported units is available here: https://mathjs.org/docs/datatypes/units.html
 
-Units can be specified for definition lines which are read by the app. If the calculated answer is going to contain units, the answer will be written in a suggested set of units based on the calculation. If more control over the units is required, these can be specified by writing in the desired units after the last '=' sign which the answer will be converted into .
+Units can be specified for definition lines which are read by the app. If the calculated answer is going to contain units, the answer will be written in a suggested set of units based on the calculation. If more control over the units is required, these can be specified by writing in the desired units after the last '=' sign which the answer will be converted into. For example, 1kN + 2kN = N will evaluate to 3000N.
 
 Most SI and engineering units are supported as well as some imperial units.
 

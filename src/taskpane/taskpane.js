@@ -150,12 +150,14 @@ async function Excel_or_Word_update(updateSelection) {
         ? clean(rawTexts[i].split(";")[1])
         : clean(rawTexts[i]);
 
-      // ── Split on '=' and branch on part count ────────────────
-      typeSwitch = /[/*\-+]/.test(rawLine) ? "CALCULATED" : "DEFINED";
+      // ── If the second to last term has an operator, it is calculated ────────────────
+      splitLine = rawLine.split("=");
+      l = splitLine.length - 2;
+      typeSwitch = /[/*\-+?]/.test(splitLine[l]) ? "CALCULATED" : "DEFINED";
       let row = null;
 
       switch (typeSwitch) {
-        // ── DEFINED variable (exactly one '=') ─────────────────
+        // ── DEFINED variable ─────────────────
         case "DEFINED": {
           const [lineVar, lineResult] = rawLine.split("=");
           try {
@@ -176,7 +178,7 @@ async function Excel_or_Word_update(updateSelection) {
           break;
         }
 
-        // ── CALCULATED line (exactly two '=') ──────────────────
+        // ── CALCULATED line ──────────────────
         case "CALCULATED": {
           let lineVar, expression, answer, targetunits, existingDecimalPlaces;
           targetunits = "";
@@ -278,7 +280,7 @@ async function Excel_or_Word_update(updateSelection) {
 
   // ── 5. Status ────────────────────────────────────────────────
   if (errors.length > 0) {
-    setStatus("Done with " + errors.length + " warning(s)", "err");
+    setStatus("Done with " + errors.length + " warning(s)" + errors, "err");
     console.warn("Calcs for word warnings:", errors);
     const el = document.getElementById("bad-flash-overlay");
     el.classList.remove("flash-active");
@@ -308,16 +310,18 @@ function renderTable(df) {
   }
 
   for (const row of df) {
-    const tr = document.createElement("tr");
+    if (row.name !== undefined) {
+      const tr = document.createElement("tr");
 
-    const valClass = "col-val" + (row.valueStr === "ERROR" ? " nan" : "");
+      const valClass = "col-val" + (row.valueStr === "ERROR" ? " nan" : "");
 
-    tr.innerHTML =
-      `<td class="col-name">${escapeHtml(row.name)}</td>` +
-      `<td class="col-eq">${escapeHtml(row.equation)}</td>` +
-      `<td class="${valClass}">${escapeHtml(row.valueStr)}</td>`;
+      tr.innerHTML =
+        `<td class="col-name">${escapeHtml(row.name)}</td>` +
+        `<td class="col-eq">${escapeHtml(row.equation)}</td>` +
+        `<td class="${valClass}">${escapeHtml(row.valueStr)}</td>`;
 
-    tbody.appendChild(tr);
+      tbody.appendChild(tr);
+    }
   }
 }
 // ─── Insert character ─────────────────────────────────────────

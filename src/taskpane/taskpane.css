@@ -44,7 +44,7 @@ body {
 /* ─── Flash overlay ─── */
 #ok-flash-overlay {
   position: fixed; inset: 0;
-  background: #076900;
+  background: #0769007e;
   pointer-events: none;
   opacity: 0; z-index: 9999;
 }
@@ -57,7 +57,7 @@ body {
 }
 #bad-flash-overlay {
   position: fixed; inset: 0;
-  background: #7a0000;
+  background: #7a000081;
   pointer-events: none;
   opacity: 0; z-index: 9999;
 }
