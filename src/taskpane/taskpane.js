@@ -535,10 +535,8 @@ async function insertTemplateIntoDocument(fileName, downloadUrl) {
   const text = await res.text();
 
   await Word.run(async (context) => {
-    const body = context.document.body;
-    // Insert a page break then the template content at the end of the document
-    body.insertBreak(Word.BreakType.page, Word.InsertLocation.end);
-    body.insertText(text, Word.InsertLocation.end);
+    const selection = context.document.getSelection();
+    selection.insertText(text, Word.InsertLocation.replace);
     await context.sync();
   });
 }
