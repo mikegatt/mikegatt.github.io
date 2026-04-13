@@ -472,7 +472,7 @@ async function loadTemplatesList() {
     // Each non-blank, non-comment line is a filename
     const fileNames = text
       .split("\n")
-      .map((l) => l.trim().replace(".txt", ""))
+      .map((l) => l.trim())
       .filter((l) => l.length > 0 && !l.startsWith("#"));
 
     if (fileNames.length === 0) {
@@ -490,7 +490,7 @@ async function loadTemplatesList() {
 
       const nameSpan = document.createElement("span");
       nameSpan.className = "template-item-name";
-      nameSpan.textContent = fileName;
+      nameSpan.textContent = fileName.replace(".txt", "");
 
       const insertBtn = document.createElement("button");
       insertBtn.className = "template-item-insert";
