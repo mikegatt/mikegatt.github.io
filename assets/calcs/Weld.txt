@@ -1,0 +1,11 @@
+Check weld from section to plate, 2no 6mm fillet welds, 200mm deep.
+Length of weld;	l = 200mm
+Leg length of weld; 	s = 6mm
+Throat length; 	a = 0.7*s 	=4.2 mm
+Partial factor for shear;	γM2 = 1.25
+Section ultimate stress;	fup = 470N/mm²
+Correlation factor for S355;	βw = 0.9
+Direction factor for a longitudinal weld;	K = 1.0
+Weld shear strength;	fvwd = (fup/(3)^0.5)/(βw*γM2) 	=241.20 MPa
+Weld strength per mm; 	FwTrd = a*K* fvwd 	=1.0 kN / mm
+Weld strength;	Fw = FwTrd*(l-2*s)	=190.5 kN

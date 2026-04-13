@@ -1,6 +1,4 @@
 # Template index
-<<<<<<< HEAD
 SHS-axial-buckling.txt
-=======
-SHS-axial-buckling.txt
->>>>>>> 6cfa8e1a4d57112fd1341fccb801747fd82862ed
+Bolt.txt
+Weld.txt

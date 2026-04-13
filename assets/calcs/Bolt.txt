@@ -1,0 +1,19 @@
+Consider bolt to be grade 8.8
+Bolt diameter;	d = 20mm
+Hole diameter;	d0 = d +2mm	=22 mm
+Plate thickness;	t = 25mm
+End distance;	e1 = 40mm
+Edge distance;	e2 = 30mm
+Bolt tensile stress area;	As = 245mm²
+Bolt ultimate strength;	fub = 800N/mm²
+Plate ultimate strength;	fu = 470N/mm2
+
+Factor for bearing;	k1 = min(2.8*e2/d0-1.7,2.5)	=2.12
+Factor for other bolts;	k2 = 0.9
+Bearing factor;	αb = min(e1/(3*d0),fub/fu,1)	=0.61
+For grade 8.8 bolts;	αv = 0.6
+Partial factor;	γM2	=1.25
+
+Tensile strength of bolt;	Ftrd = k2*fub*As/γM2	=141.1 kN
+Shear strength of bolt;	Fvrd = αv*fub*As/ γM2	=94.1 kN
+Bearing strength in plate;	Fbrd = k1*αb*fu*d*t/ γM2	=241.3 kN
