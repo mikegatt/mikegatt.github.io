@@ -472,7 +472,7 @@ async function loadTemplatesList() {
     // Each non-blank, non-comment line is a filename
     const fileNames = text
       .split("\n")
-      .map((l) => l.trim().replace(".md", ""))
+      .map((l) => l.trim().replace(".txt", ""))
       .filter((l) => l.length > 0 && !l.startsWith("#"));
 
     if (fileNames.length === 0) {
