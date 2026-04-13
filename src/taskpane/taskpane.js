@@ -82,7 +82,20 @@ Office.onReady(function () {
       modal.style.display = "none";
     }
   };
-  const grid = document.getElementById("character-grid");
+  // ── Templates modal ──────────────────────────────────────────
+  const templatesModal = document.getElementById("templatesModal");
+  document.getElementById("templatesBtn").onclick = function () {
+    templatesModal.style.display = "block";
+    loadTemplatesList();
+  };
+  document.getElementById("templatesClose").onclick = function () {
+    templatesModal.style.display = "none";
+  };
+  window.addEventListener("click", function (event) {
+    if (event.target === templatesModal) {
+      templatesModal.style.display = "none";
+    }
+  });
   grid.innerHTML = ""; // Clear existing buttons first
   characters.forEach((char) => {
     const btn = document.createElement("button");
@@ -153,7 +166,7 @@ async function Excel_or_Word_update(updateSelection) {
       // ── If the second to last term has an operator, it is calculated ────────────────
       splitLine = rawLine.split("=");
       l = splitLine.length - 2;
-      typeSwitch = /[/*\-+?]/.test(splitLine[l]) ? "CALCULATED" : "DEFINED";
+      typeSwitch = /[/*\-+?]|min|max/.test(splitLine[l]) ? "CALCULATED" : "DEFINED";
       let row = null;
 
       switch (typeSwitch) {
@@ -366,6 +379,10 @@ function convertSuperscripts(str) {
   if (!str) return str;
   return str.replace(/²/g, "^2").replace(/³/g, "^3").replace(/⁴/g, "^4").replace(/⁶/g, "^6");
 }
+function convertToSuperscripts(str) {
+  if (!str) return str;
+  return str.replace(/\^2/g, "²").replace(/\^3/g, "³").replace(/\^4/g, "⁴").replace(/\^6/g, "⁶");
+}
 /**
  * Count the number of decimal places in the numeric part of an answer string.
  * e.g. "3.14 m^2" → 2,  "42 kN" → 0,  "0.1800" → 4,  "42" → 0
@@ -424,10 +441,7 @@ function formatValue(val, decimalPlaces) {
   // Fallback for other types
   return String(val);
 }
-function convertToSuperscripts(str) {
-  if (!str) return str;
-  return str.replace(/\^2/g, "²").replace(/\^3/g, "³").replace(/\^4/g, "⁴").replace(/\^6/g, "⁶");
-}
+
 /**
  * Check if a value represents an error (NaN, null, undefined, or error object).
  */
@@ -439,7 +453,104 @@ function isErrorValue(val) {
   return false;
 }
 
-//add in some more engineering focused units
+// ─── Templates ───────────────────────────────────────────────
+
+const GITHUB_DIR_URL =
+  "https://github.com/mikegatt/mikegatt.github.io/tree/main/assets/calcs";
+const GITHUB_RAW_BASE =
+  "https://raw.githubusercontent.com/mikegatt/mikegatt.github.io/main/assets/calcs/";
+
+async function loadTemplatesList() {
+  const statusEl = document.getElementById("templates-status");
+  const listEl = document.getElementById("templates-list");
+  listEl.innerHTML = "";
+  statusEl.textContent = "Loading templates…";
+  statusEl.style.color = "#64748b";
+
+  try {
+    const res = await fetch(GITHUB_DIR_URL);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const html = await res.text();
+
+    // Parse file names from the GitHub directory listing HTML
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, "text/html");
+    // GitHub renders file links as anchors with href="/owner/repo/blob/branch/path/filename"
+    const anchors = Array.from(doc.querySelectorAll('a[href*="/blob/"]'));
+    const fileNames = [
+      ...new Set(
+        anchors
+          .map((a) => a.getAttribute("href").split("/").pop())
+          .filter((name) => name && !name.startsWith("."))
+      ),
+    ];
+
+    if (fileNames.length === 0) {
+      statusEl.textContent = "No templates found.";
+      return;
+    }
+
+    statusEl.textContent =
+      fileNames.length + " template(s) available. Click to insert into document.";
+    statusEl.style.color = "#16a34a";
+
+    fileNames.forEach((fileName) => {
+      const item = document.createElement("div");
+      item.className = "template-item";
+
+      const nameSpan = document.createElement("span");
+      nameSpan.className = "template-item-name";
+      nameSpan.textContent = fileName;
+
+      const insertBtn = document.createElement("button");
+      insertBtn.className = "template-item-insert";
+      insertBtn.textContent = "Insert ↩";
+      insertBtn.onclick = async function () {
+        insertBtn.disabled = true;
+        insertBtn.textContent = "Inserting…";
+        try {
+          await insertTemplateIntoDocument(fileName, GITHUB_RAW_BASE + encodeURIComponent(fileName));
+          insertBtn.textContent = "✓ Done";
+          document.getElementById("templatesModal").style.display = "none";
+        } catch (e) {
+          insertBtn.textContent = "Error";
+          console.error(e);
+          statusEl.textContent = "Error inserting template: " + e.message;
+          statusEl.style.color = "#dc2626";
+        } finally {
+          setTimeout(() => {
+            insertBtn.disabled = false;
+            insertBtn.textContent = "Insert ↩";
+          }, 2000);
+        }
+      };
+
+      item.appendChild(nameSpan);
+      item.appendChild(insertBtn);
+      listEl.appendChild(item);
+    });
+  } catch (e) {
+    statusEl.textContent = "Failed to load templates: " + e.message;
+    statusEl.style.color = "#dc2626";
+    console.error(e);
+  }
+}
+
+async function insertTemplateIntoDocument(fileName, downloadUrl) {
+  const res = await fetch(downloadUrl);
+  if (!res.ok) throw new Error("Could not fetch " + fileName + " (HTTP " + res.status + ")");
+  const text = await res.text();
+
+  await Word.run(async (context) => {
+    const body = context.document.body;
+    // Insert a page break then the template content at the end of the document
+    body.insertBreak(Word.BreakType.page, Word.InsertLocation.end);
+    body.insertText(text, Word.InsertLocation.end);
+    await context.sync();
+  });
+}
+
+
 math.createUnit({
   Nm: {
     definition: "1 N*m",
