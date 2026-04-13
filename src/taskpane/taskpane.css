@@ -2,6 +2,7 @@
  * Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT license.
  * See LICENSE in the project root for license information.
  */
+
 /* ─── Reset ─── */
 *,
 *::before,
@@ -14,6 +15,7 @@
 /* ─── Root / layout ─── */
 html,
 body {
+  width: 100%;
   height: 100%;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   background: #f3f4f6;
@@ -24,15 +26,24 @@ body {
 body {
   display: flex;
   flex-direction: column;
-  padding: 16px;
+  padding: 10px;
   gap: 12px;
   overflow-y: auto;
+}
+
+ul {
+  margin: 0;
+  padding: 0;
+}
+
+b {
+  font-weight: bold;
 }
 
 /* ─── Header ─── */
 .header {
   text-align: center;
-  padding-bottom: 10px;
+  padding: 12px 16px 12px;
   border-bottom: 2px solid #3b82f6;
 }
 .header h1 {
@@ -45,37 +56,99 @@ body {
   color: #64748b;
   margin-top: 2px;
 }
-/* ─── Flash overlay ─── */
+
+/* ─── Welcome header ─── */
+.ms-welcome__header {
+  padding: 20px 20px 30px;
+  padding-top: 100px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* ─── Welcome main ─── */
+.ms-welcome__main {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: center;
+  flex: 1 0 0;
+  padding: 16px 24px;
+}
+
+.ms-welcome__main > h2 {
+  width: 100%;
+  text-align: center;
+}
+
+/* ─── Welcome features ─── */
+.ms-welcome__features {
+  list-style-type: none;
+  margin-top: 20px;
+}
+
+.ms-welcome__features.ms-List .ms-ListItem {
+  padding-bottom: 20px;
+  display: flex;
+}
+
+.ms-welcome__features.ms-List .ms-ListItem > .ms-Icon {
+  margin-right: 10px;
+}
+
+.ms-welcome__action.ms-Button--hero {
+  margin-top: 30px;
+}
+
+/* ─── Hero button ─── */
+.ms-Button.ms-Button--hero .ms-Button-label {
+  color: #0078d7;
+}
+
+.ms-Button.ms-Button--hero:hover .ms-Button-label,
+.ms-Button.ms-Button--hero:focus .ms-Button-label {
+  color: #005a9e;
+  cursor: pointer;
+}
+
+/* ─── Flash overlays ─── */
 #ok-flash-overlay {
-  position: fixed; inset: 0;
+  position: fixed;
+  inset: 0;
   background: #0769007e;
   pointer-events: none;
-  opacity: 0; z-index: 9999;
+  opacity: 0;
+  z-index: 9999;
 }
 #ok-flash-overlay.flash-active {
   animation: greenFlash 600ms ease-out forwards;
 }
-@keyframes greenFlash {
-  0%   { opacity: 0.85; }
-  100% { opacity: 0; }
-}
+
 #bad-flash-overlay {
-  position: fixed; inset: 0;
+  position: fixed;
+  inset: 0;
   background: #7a000081;
   pointer-events: none;
-  opacity: 0; z-index: 9999;
+  opacity: 0;
+  z-index: 9999;
 }
 #bad-flash-overlay.flash-active {
-  animation: greenFlash 600ms ease-out forwards;
+  animation: redFlash 600ms ease-out forwards;
 }
+
 @keyframes greenFlash {
   0%   { opacity: 0.85; }
   100% { opacity: 0; }
 }
-/* ─── Update button ─── */
+@keyframes redFlash {
+  0%   { opacity: 0.85; }
+  100% { opacity: 0; }
+}
+
+/* ─── Primary button ─── */
 .btnUpdate {
   width: 100%;
-  padding: 11px 0;
+  padding: 11px 16px;
   background: linear-gradient(135deg, #3b82f6, #2563eb);
   color: #fff;
   border: none;
@@ -101,10 +174,11 @@ body {
   transform: none;
 }
 
-/* ─── Secondary button (less bold) ─── */
+/* ─── Secondary button ─── */
+
 .btnCheat {
-  width: 100%;
-  padding: 8px 0;
+  width: 49%;
+  padding: 11px 16px;
   background: #eff6ff;
   color: #1e40af;
   border: 1.5px solid #3b82f6;
@@ -138,6 +212,7 @@ body {
   font-size: 12px;
   color: #475569;
   min-height: 18px;
+  padding: 4px 0;
   text-align: center;
   font-style: italic;
 }
@@ -173,7 +248,7 @@ thead {
   z-index: 2;
 }
 thead th {
-  padding: 8px 10px;
+  padding: 10px 12px;
   text-align: left;
   font-weight: 600;
   letter-spacing: 0.3px;
@@ -195,14 +270,14 @@ tbody tr:hover {
 }
 
 tbody td {
-  padding: 7px 10px;
+  padding: 8px 12px;
   border-right: 1px solid #f1f5f9;
 }
 tbody td:last-child {
   border-right: none;
 }
 
-/* column-specific colouring */
+/* Column-specific colouring */
 .col-type {
   color: #7c3aed;
   font-weight: 600;
@@ -228,7 +303,7 @@ tbody td:last-child {
   color: #dc2626;
 }
 
-/* empty-state row */
+/* Empty-state row */
 .empty-row td {
   text-align: center;
   color: #94a3b8;
@@ -241,62 +316,63 @@ tbody td:last-child {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 7px;
-  padding: 10px 12px;
+  padding: 12px 16px;
   font-size: 11.5px;
   color: #475569;
 }
 .modal-content h3 {
   font-size: large;
   color: #1e40af;
-  margin-bottom: 5px;
+  margin-bottom: 8px;
 }
 .modal-content code {
   background: #eef2ff;
-  padding: 1px 5px;
+  padding: 2px 6px;
   border-radius: 3px;
   font-size: 11px;
   color: #4338ca;
 }
 .modal-content .row {
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 .modal-content .label {
   font-weight: 600;
   color: #334155;
 }
 
-/* The Modal (background) */
+/* ─── Modal ─── */
 .modal {
-  display: none; /* Hidden by default */
-  position: fixed; /* Stay in place */
-  z-index: 99999; /* Sit on top of everything */
+  display: none;
+  position: fixed;
+  z-index: 99999;
   left: 0;
   top: 0;
-  width: 100%; /* Full width */
-  height: 100%; /* Full height */
-  overflow: auto; /* Enable scroll if needed */
-  background-color: rgba(0, 0, 0, 0.4); /* Black w/ opacity */
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0, 0, 0, 0.4);
 }
-/* Character button */
+
+.modal-content {
+  background-color: #fefefe;
+  position: relative;
+  margin: 10% auto;
+  padding: 24px;
+  border: 1px solid #888;
+  border-radius: 8px;
+  width: 80%;
+  font-size: medium;
+}
+
+/* ─── Character button ─── */
 .character-btn {
   font-size: 1.5rem;
   padding: 0.1rem 0.1rem;
   cursor: pointer;
-    color: #475569;
-}
-/* Modal Content/Box */
-.modal-content {
-  background-color: #fefefe;
-  position: relative;
-  margin: 10% auto; /* 10% from the top and centered */
-  padding: 20px;
-  border: 1px solid #888;
-  border-radius: 8px;
-  width: 80%; /* Could be more or less, depending on screen size */
-  font-size: medium;
+  color: #475569;
 }
 
-/* The Close Button */
+/* ─── Close button ─── */
 .close {
   position: absolute;
   top: 8px;
@@ -315,79 +391,4 @@ tbody td:last-child {
   color: #111827;
   text-decoration: none;
   outline: none;
-}
- html,
- body {
-     width: 100%;
-     height: 100%;
-     margin: 0;
-     padding: 0;
- }
- 
- ul {
-     margin: 0;
-     padding: 0;
- }
- 
- .ms-welcome__header {
-    padding: 20px;
-    padding-bottom: 30px;
-    padding-top: 100px;
-    display: -webkit-flex;
-    display: flex;
-    -webkit-flex-direction: column;
-    flex-direction: column;
-    align-items: center;
- }
-
- .ms-welcome__main {
-    display: -webkit-flex;
-    display: flex;
-    -webkit-flex-direction: column;
-    flex-direction: column;
-    -webkit-flex-wrap: nowrap;
-    flex-wrap: nowrap;
-    -webkit-align-items: center;
-    align-items: center;
-    -webkit-flex: 1 0 0;
-    flex: 1 0 0;
-    padding: 10px 20px;
- }
- 
- .ms-welcome__main > h2 {
-     width: 100%;
-     text-align: center;
- }
- 
- .ms-welcome__features {
-     list-style-type: none;
-     margin-top: 20px;
- }
- 
- .ms-welcome__features.ms-List .ms-ListItem {
-     padding-bottom: 20px;
-     display: -webkit-flex;
-     display: flex;
- }
- 
- .ms-welcome__features.ms-List .ms-ListItem > .ms-Icon {
-     margin-right: 10px;
- }
- 
- .ms-welcome__action.ms-Button--hero {
-     margin-top: 30px;
- }
- 
-.ms-Button.ms-Button--hero .ms-Button-label {
-  color: #0078d7;
-}
-
-.ms-Button.ms-Button--hero:hover .ms-Button-label,
-.ms-Button.ms-Button--hero:focus .ms-Button-label{
-  color: #005a9e;
-  cursor: pointer;
-}
-
-b {
-    font-weight: bold;
 }

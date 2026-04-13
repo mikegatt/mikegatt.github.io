@@ -62,9 +62,11 @@
 
     <div class="row">
       <!-- Trigger/Open The Modal -->
-      <button class="btnCheat" id="clearBtn">❌ Clear variables</button>
+      <button class="btnUpdate" id="clearBtn">❌ Clear variables</button>
+    </div>
+    <div class="row" style="text-align: center;">
       <button class="btnCheat" id="modalBtn">📝 Cheat sheet</button>
-      <button class="btnCheat" id="templatesBtn">📁 Templates</button>
+      <button class="btnCheat" id="templatesBtn">🧳 My Calcs</button>
     </div>
     <!-- The Modal -->
     <div id="myModal" class="modal">
@@ -82,37 +84,50 @@
           <code>(Optional Description); (optional result =) expression = (optional units)</code>
         </div>
         <div class="row" style="margin-top: 6px; color: #64748b">
-          The final value in a calculation line is written back by the app after the last <code>=</code>. The number of decimal places will match what is present in this field when the doc us updated.
+          The final value in a calculation line is written back by the app after the last
+          <code>=</code>. The number of decimal places will match what is present in this field when
+          the doc us updated.
         </div>
         <div class="row" style="margin-top: 6px; color: #64748b">
-          If units are used, these should be specified in the defintions and optionally in the answer.
+          If units are used, these should be specified in the defintions and optionally in the
+          answer.
         </div>
         <h3>⚡️ Powers</h3>
         <div class="row" style="margin-top: 6px; color: #64748b">
           Click any power character below to add it:
         </div>
         <div class="row">
-          <div id="power-grid"style="margin-top: 6px; color: #64748b"></div>
+          <div id="power-grid" style="margin-top: 6px; color: #64748b"></div>
         </div>
-        <div class="row"style="margin-top: 6px; color: #64748b">Any other powers can be written out inline e.g. <code>x^1.33</code></div>
+        <div class="row" style="margin-top: 6px; color: #64748b">
+          Any other powers can be written out inline e.g. <code>x^1.33</code>
+        </div>
         <h3>🏺 Greek characters</h3>
         <div class="row" style="margin-top: 6px; color: #64748b">
           Click any greek character below to add it:
         </div>
         <div class="row">
-          <div id="character-grid"style="margin-top: 6px; color: #64748b"></div>
+          <div id="character-grid" style="margin-top: 6px; color: #64748b"></div>
         </div>
         <div class="row" style="margin-top: 6px; color: #64748b">
-          <strong>Need more help? </strong>Check out the guide here: <a href='https://github.com/mikegatt/calcs/blob/main/README.md'>Read me</a>
+          <strong>Need more help? </strong>Check out the guide here:
+          <a href="https://github.com/mikegatt/calcs/blob/main/README.md">Read me</a>
         </div>
       </div>
     </div>
     <!-- Templates Modal -->
     <div id="templatesModal" class="modal">
       <div class="modal-content">
-        <button class="close" id="templatesClose" aria-label="Close templates modal">&times;</button>
-        <h3>📁 Templates</h3>
-        <div id="templates-status" style="margin: 8px 0; font-size: 12px; color: #64748b; font-style: italic;">Loading templates…</div>
+        <button class="close" id="templatesClose" aria-label="Close templates modal">
+          &times;
+        </button>
+        <h3>🧳 My Calcs</h3>
+        <div
+          id="templates-status"
+          style="margin: 8px 0; font-size: 12px; color: #64748b; font-style: italic"
+        >
+          Loading templates…
+        </div>
         <div id="templates-list"></div>
       </div>
     </div>

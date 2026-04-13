@@ -82,20 +82,7 @@ Office.onReady(function () {
       modal.style.display = "none";
     }
   };
-  // ── Templates modal ──────────────────────────────────────────
-  const templatesModal = document.getElementById("templatesModal");
-  document.getElementById("templatesBtn").onclick = function () {
-    templatesModal.style.display = "block";
-    loadTemplatesList();
-  };
-  document.getElementById("templatesClose").onclick = function () {
-    templatesModal.style.display = "none";
-  };
-  window.addEventListener("click", function (event) {
-    if (event.target === templatesModal) {
-      templatesModal.style.display = "none";
-    }
-  });
+  const grid = document.getElementById("character-grid");
   grid.innerHTML = ""; // Clear existing buttons first
   characters.forEach((char) => {
     const btn = document.createElement("button");
@@ -112,6 +99,20 @@ Office.onReady(function () {
     powbtn.classList.add("character-btn");
     powbtn.addEventListener("click", () => insertCharacterToDocument(pow, modal));
     document.getElementById("power-grid").appendChild(powbtn);
+  });
+  // ── Templates modal ──────────────────────────────────────────
+  const templatesModal = document.getElementById("templatesModal");
+  document.getElementById("templatesBtn").onclick = function () {
+    templatesModal.style.display = "block";
+    loadTemplatesList();
+  };
+  document.getElementById("templatesClose").onclick = function () {
+    templatesModal.style.display = "none";
+  };
+  window.addEventListener("click", function (event) {
+    if (event.target === templatesModal) {
+      templatesModal.style.display = "none";
+    }
   });
 });
 
@@ -453,10 +454,6 @@ function isErrorValue(val) {
   return false;
 }
 
-// ─── Templates ───────────────────────────────────────────────
-
-const GITHUB_DIR_URL =
-  "https://github.com/mikegatt/mikegatt.github.io/tree/main/assets/calcs";
 const GITHUB_RAW_BASE =
   "https://raw.githubusercontent.com/mikegatt/mikegatt.github.io/main/assets/calcs/";
 
@@ -468,22 +465,15 @@ async function loadTemplatesList() {
   statusEl.style.color = "#64748b";
 
   try {
-    const res = await fetch(GITHUB_DIR_URL);
+    const res = await fetch(GITHUB_RAW_BASE + "index.txt");
     if (!res.ok) throw new Error("HTTP " + res.status);
-    const html = await res.text();
+    const text = await res.text();
 
-    // Parse file names from the GitHub directory listing HTML
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, "text/html");
-    // GitHub renders file links as anchors with href="/owner/repo/blob/branch/path/filename"
-    const anchors = Array.from(doc.querySelectorAll('a[href*="/blob/"]'));
-    const fileNames = [
-      ...new Set(
-        anchors
-          .map((a) => a.getAttribute("href").split("/").pop())
-          .filter((name) => name && !name.startsWith("."))
-      ),
-    ];
+    // Each non-blank, non-comment line is a filename
+    const fileNames = text
+      .split("\n")
+      .map((l) => l.trim().replace(".md", ""))
+      .filter((l) => l.length > 0 && !l.startsWith("#"));
 
     if (fileNames.length === 0) {
       statusEl.textContent = "No templates found.";
@@ -509,7 +499,10 @@ async function loadTemplatesList() {
         insertBtn.disabled = true;
         insertBtn.textContent = "Inserting…";
         try {
-          await insertTemplateIntoDocument(fileName, GITHUB_RAW_BASE + encodeURIComponent(fileName));
+          await insertTemplateIntoDocument(
+            fileName,
+            GITHUB_RAW_BASE + encodeURIComponent(fileName)
+          );
           insertBtn.textContent = "✓ Done";
           document.getElementById("templatesModal").style.display = "none";
         } catch (e) {
@@ -549,7 +542,6 @@ async function insertTemplateIntoDocument(fileName, downloadUrl) {
     await context.sync();
   });
 }
-
 
 math.createUnit({
   Nm: {

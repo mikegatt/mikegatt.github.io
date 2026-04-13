@@ -1,4 +1,6 @@
 System length;  L = 2m
+Radius of gyration; i = 1.11cm
+Yield stress;   fy = 355N/mm²
 Effective length factor;	k = 1
 Effective length; 	Le = L*k	=2.0 m
 Critical buckling force;	Ncr = (pi)2*E*Iy / Le²	=23 kN
