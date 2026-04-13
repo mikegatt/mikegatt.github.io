@@ -21,7 +21,7 @@
     <Host Name="Document"/>
   </Hosts>
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://mikegatt.github.io/src/taskpane/taskpane.html"/>
+    <SourceLocation DefaultValue="localhost:3000/taskpane.html"/>
   </DefaultSettings>
   <Permissions>ReadWriteDocument</Permissions>
   
@@ -75,8 +75,8 @@
       </bt:Images>
       <bt:Urls>
         <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://www.mikegatt.github.io"/>
-        <bt:Url id="Commands.Url" DefaultValue="https://mikegatt.github.io/src/commands/commands.html"/>
-        <bt:Url id="Taskpane.Url" DefaultValue="https://mikegatt.github.io/src/taskpane/taskpane.html"/>
+        <bt:Url id="Commands.Url" DefaultValue="https://localhost:3000/commands.html"/>
+        <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:3000/taskpane.html"/>
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GetStarted.Title" DefaultValue="Get started with Calcs for Word"/>
