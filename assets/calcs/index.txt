@@ -1,4 +1,0 @@
-# Template index
-SHS-axial-buckling.txt
-Bolt.txt
-Weld.txt

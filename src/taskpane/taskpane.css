@@ -177,7 +177,7 @@ b {
 /* ─── Secondary button ─── */
 
 .btnCheat {
-  width: 49%;
+  width: 100%;
   padding: 11px 16px;
   background: #eff6ff;
   color: #1e40af;

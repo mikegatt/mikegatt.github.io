@@ -100,20 +100,6 @@ Office.onReady(function () {
     powbtn.addEventListener("click", () => insertCharacterToDocument(pow, modal));
     document.getElementById("power-grid").appendChild(powbtn);
   });
-  // ── Templates modal ──────────────────────────────────────────
-  const templatesModal = document.getElementById("templatesModal");
-  document.getElementById("templatesBtn").onclick = function () {
-    templatesModal.style.display = "block";
-    loadTemplatesList();
-  };
-  document.getElementById("templatesClose").onclick = function () {
-    templatesModal.style.display = "none";
-  };
-  window.addEventListener("click", function (event) {
-    if (event.target === templatesModal) {
-      templatesModal.style.display = "none";
-    }
-  });
 });
 
 // ─── Core update routine ─────────────────────
@@ -452,93 +438,6 @@ function isErrorValue(val) {
   // math.js might return error objects in some cases
   if (val instanceof Error) return true;
   return false;
-}
-
-const GITHUB_RAW_BASE =
-  "https://raw.githubusercontent.com/mikegatt/mikegatt.github.io/main/assets/calcs/";
-
-async function loadTemplatesList() {
-  const statusEl = document.getElementById("templates-status");
-  const listEl = document.getElementById("templates-list");
-  listEl.innerHTML = "";
-  statusEl.textContent = "Loading templates…";
-  statusEl.style.color = "#64748b";
-
-  try {
-    const res = await fetch(GITHUB_RAW_BASE + "index.txt");
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    const text = await res.text();
-
-    // Each non-blank, non-comment line is a filename
-    const fileNames = text
-      .split("\n")
-      .map((l) => l.trim())
-      .filter((l) => l.length > 0 && !l.startsWith("#"));
-
-    if (fileNames.length === 0) {
-      statusEl.textContent = "No templates found.";
-      return;
-    }
-
-    statusEl.textContent =
-      fileNames.length + " template(s) available. Click to insert into document.";
-    statusEl.style.color = "#16a34a";
-
-    fileNames.forEach((fileName) => {
-      const item = document.createElement("div");
-      item.className = "template-item";
-
-      const nameSpan = document.createElement("span");
-      nameSpan.className = "template-item-name";
-      nameSpan.textContent = fileName.replace(".txt", "");
-
-      const insertBtn = document.createElement("button");
-      insertBtn.className = "template-item-insert";
-      insertBtn.textContent = "Insert ↩";
-      insertBtn.onclick = async function () {
-        insertBtn.disabled = true;
-        insertBtn.textContent = "Inserting…";
-        try {
-          await insertTemplateIntoDocument(
-            fileName,
-            GITHUB_RAW_BASE + encodeURIComponent(fileName)
-          );
-          insertBtn.textContent = "✓ Done";
-          document.getElementById("templatesModal").style.display = "none";
-        } catch (e) {
-          insertBtn.textContent = "Error";
-          console.error(e);
-          statusEl.textContent = "Error inserting template: " + e.message;
-          statusEl.style.color = "#dc2626";
-        } finally {
-          setTimeout(() => {
-            insertBtn.disabled = false;
-            insertBtn.textContent = "Insert ↩";
-          }, 2000);
-        }
-      };
-
-      item.appendChild(nameSpan);
-      item.appendChild(insertBtn);
-      listEl.appendChild(item);
-    });
-  } catch (e) {
-    statusEl.textContent = "Failed to load templates: " + e.message;
-    statusEl.style.color = "#dc2626";
-    console.error(e);
-  }
-}
-
-async function insertTemplateIntoDocument(fileName, downloadUrl) {
-  const res = await fetch(downloadUrl);
-  if (!res.ok) throw new Error("Could not fetch " + fileName + " (HTTP " + res.status + ")");
-  const text = await res.text();
-
-  await Word.run(async (context) => {
-    const selection = context.document.getSelection();
-    selection.insertText(text, Word.InsertLocation.replace);
-    await context.sync();
-  });
 }
 
 math.createUnit({
