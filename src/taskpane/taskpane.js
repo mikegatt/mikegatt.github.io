@@ -2,60 +2,14 @@
 // Calcs for word – Office.js add-in with math.js units
 // ──────────────────────────────────────────────
 
-let df = []; // the "dataframe"
+let df = []; 
 let scope = {}; // math.js scope: name → Unit or number
 const characters = [
-  "Α",
-  "α",
-  "Β",
-  "β",
-  "Γ",
-  "γ",
-  "Δ",
-  "δ",
-  "Ε",
-  "ε",
-  "Ζ",
-  "ζ",
-  "Η",
-  "η",
-  "Θ",
-  "θ",
-  "Ι",
-  "ι",
-  "Κ",
-  "κ",
-  "Λ",
-  "λ",
-  "Μ",
-  "μ",
-  "Ν",
-  "ν",
-  "Ξ",
-  "ξ",
-  "Ο",
-  "ο",
-  "Π",
-  "π",
-  "Ρ",
-  "ρ",
-  "Σ",
-  "σ",
-  "ς",
-  "Τ",
-  "τ",
-  "Υ",
-  "υ",
-  "Φ",
-  "φ",
-  "Χ",
-  "χ",
-  "Ψ",
-  "ψ",
-  "Ω",
-  "ω",
+  "Α", "α", "Β", "β", "Γ", "γ", "Δ", "δ", "Ε", "ε", "Ζ", "ζ", "Η", "η", "Θ",
+  "θ", "Ι", "ι", "Κ", "κ", "Λ", "λ", "Μ", "μ", "Ν", "ν", "Ξ", "ξ", "Ο", "ο",
+  "Π", "π", "Ρ", "ρ", "Σ", "σ", "ς", "Τ", "τ", "Υ", "υ", "Φ", "φ", "Χ", "χ",
+  "Ψ", "ψ", "Ω", "ω",
 ];
-const powers = ["²", "³", "⁴", "⁶"];
 
 Office.onReady(function () {
   document.getElementById("btnUpdate").onclick = function () {
@@ -88,17 +42,8 @@ Office.onReady(function () {
     const btn = document.createElement("button");
     btn.textContent = char;
     btn.classList.add("character-btn");
-    btn.addEventListener("click", () => insertCharacterToDocument(char, modal));
+    btn.addEventListener("click", () => insertCharacterToDocument(char, modal, false));
     document.getElementById("character-grid").appendChild(btn);
-  });
-  const powgrid = document.getElementById("power-grid");
-  powgrid.innerHTML = ""; // Clear existing buttons first
-  powers.forEach((pow) => {
-    const powbtn = document.createElement("button");
-    powbtn.textContent = pow;
-    powbtn.classList.add("character-btn");
-    powbtn.addEventListener("click", () => insertCharacterToDocument(pow, modal));
-    document.getElementById("power-grid").appendChild(powbtn);
   });
 });
 
@@ -120,14 +65,20 @@ async function runUpdate(updateSelection) {
 }
 
 /**
- * Main Office.js routine – reads every paragraph, classifies it,
- * then immediately searches and replaces the result in the same iteration.
+ * Main Office.js routine – reads every paragraph's HTML, classifies it,
+ * then searches and replaces the result (as HTML) in the same iteration.
+ *
+ * Sync plan (3 round trips total):
+ *   SYNC 1 — cheap paragraph text, just to find '=' lines
+ *   SYNC 2 — resolve getHtml() AND search("=") together for every
+ *            candidate paragraph, so both are ready before we parse
+ *   SYNC 3 — execute all queued writes (clear/insertHtml)
  */
 async function Excel_or_Word_update(updateSelection) {
   const errors = [];
 
   await Word.run(async function (context) {
-    // ── 1. Load all paragraph text ───────────────────────────────
+    // ── 1. Load all paragraph plain text (cheap first pass) ─────
     let paras;
     if (updateSelection == true) {
       paras = context.document.getSelection().paragraphs;
@@ -135,25 +86,47 @@ async function Excel_or_Word_update(updateSelection) {
       paras = context.document.body.paragraphs;
     }
     paras.load("text");
-    await context.sync(); // ← SYNC 1: read paragraph text
+    await context.sync(); // ← SYNC 1: cheap text pass, just to find '=' lines
 
-    const rawTexts = paras.items.map((p) => convertSuperscripts(p.text));
+    // ── 2. For lines that contain '=', request HTML *and* queue a
+    //       search for the last '=' at the same time. We don't yet
+    //       know which lines will need a text update, but search() is
+    //       cheap, and queuing it now avoids a dedicated round trip
+    //       later just to resolve search positions. ────────────────
+    const htmlRequests = []; // { index, range, htmlResult, searchResults }
+    for (let i = 0; i < paras.items.length; i++) {
+      if (!paras.items[i].text.includes("=")) continue;
+      const range = paras.items[i].getRange("Whole");
+      const htmlResult = range.getHtml();
+      const searchResults = range.search("=", { matchCase: true });
+      searchResults.load("items");
+      htmlRequests.push({ index: i, range, htmlResult, searchResults });
+    }
 
-    // ── 2. Parse, classify, and queue replacements ───────────
-    const searchOps = [];
+    if (htmlRequests.length === 0) {
+      renderTable(df);
+      setStatus("No definition or calculation lines found.");
+      return;
+    }
 
-    for (let i = 0; i < rawTexts.length; i++) {
-      if (!rawTexts[i].includes("=")) continue;
+    await context.sync(); // ← SYNC 2: resolve HTML + search together for candidate paragraphs
 
-      // ── Discard lineName via ';' split first ─────────────────
-      const rawLine = rawTexts[i].includes(";")
-        ? clean(rawTexts[i].split(";")[1])
-        : clean(rawTexts[i]);
+    // ── 3. Parse, classify, and queue replacements ───────────────
+    // (search results are already resolved — no extra sync needed to use them)
+    const writeOps = [];
 
-      // ── If the second to last term has an operator, it is calculated ────────────────
-      splitLine = rawLine.split("=");
-      l = splitLine.length - 2;
-      typeSwitch = /[/*\-+?]|min|max/.test(splitLine[l]) ? "CALCULATED" : "DEFINED";
+    for (const { index: i, range, htmlResult, searchResults } of htmlRequests) {
+      const fullExpr = htmlToMathExpr(htmlResult.value); // convert <sup> to ^(x) notation
+
+      // ── Discard lineName via ';' split first ────────────────
+      const rawLine = fullExpr.includes(";")
+        ? clean(fullExpr.split(";")[1])
+        : clean(fullExpr);
+
+      // ── If the second to last term has an operator, it is calculated ──
+      let splitLine = rawLine.split("=");
+      let l = splitLine.length - 2;
+      let typeSwitch = /[/*\-+?^]|min|max/.test(splitLine[l]) ? "CALCULATED" : "DEFINED";
       let row = null;
 
       switch (typeSwitch) {
@@ -198,20 +171,20 @@ async function Excel_or_Word_update(updateSelection) {
           let calcResult = null;
 
           try {
-            const result =
+            const evalResult =
               targetunits !== ""
                 ? math.evaluate(expression + " to " + targetunits, scope)
                 : math.evaluate(expression, scope);
 
-            if (isErrorValue(result)) {
+            if (isErrorValue(evalResult)) {
               errors.push(
                 `Line ${i + 1} (${lineVar}): expression "${expression}" evaluated to an error.`
               );
               newValueStr = "ERROR";
             } else {
-              scope[lineVar] = result;
-              calcResult = result;
-              newValueStr = formatValue(result, existingDecimalPlaces);
+              scope[lineVar] = evalResult;
+              calcResult = evalResult;
+              newValueStr = formatValue(evalResult, existingDecimalPlaces);
             }
           } catch (err) {
             errors.push(
@@ -228,25 +201,25 @@ async function Excel_or_Word_update(updateSelection) {
             paraIndex: i,
           };
 
-          // Queue a search() for this line if the document text needs updating
+          // Queue a write for this line if the document text needs updating.
+          // The search results are already resolved (queued back in step 2),
+          // so we can go straight to computing the write — no extra sync.
           const m2 = rawLine.match(/^(.*)=([^=]*)$/);
           if (!m2) break;
           const [, beforeLastEquals] = m2;
           if (clean(rawLine) === clean(beforeLastEquals + "=" + newValueStr)) break;
-          try {
-            const paraRange = paras.items[i].getRange("Whole");
-            const searchResults = paraRange.search("=", { matchCase: true });
-            searchResults.load("items");
-            searchOps.push({ searchResults, newResultText: newValueStr, paraRange });
-          } catch (e) {
-            errors.push(`Search error on line ${i + 1}: ${e.message}`);
+
+          if (searchResults.items.length === 0) {
+            errors.push(`Line ${i + 1}: could not locate '=' to update text.`);
+            break;
           }
+          writeOps.push({ searchResults, newResultText: newValueStr, paraRange: range });
           break;
         }
 
         // ── Unexpected format ───────────────────────────────────
         default: {
-          errors.push(`Line ${i + 1}: unexpected number of '=' signs (${parts.length - 1}).`);
+          errors.push(`Line ${i + 1}: unexpected number of '=' signs (${rawLine.split("=").length - 1}).`);
           break;
         }
       }
@@ -259,28 +232,25 @@ async function Excel_or_Word_update(updateSelection) {
       }
     }
 
-    // Resolve all searches in one shot
-    if (searchOps.length > 0) {
-      await context.sync(); // ← SYNC 2: resolve all searches
-
-      for (const { searchResults, newResultText, paraRange } of searchOps) {
-        if (searchResults.items.length === 0) continue;
+    // ── 4. Execute all writes in one shot ─────────────────────────
+    if (writeOps.length > 0) {
+      for (const { searchResults, newResultText, paraRange } of writeOps) {
         const lastEquals = searchResults.items[searchResults.items.length - 1];
         const rangeAfterEquals = lastEquals.getRange("After").expandTo(paraRange.getRange("End"));
-        rangeAfterEquals.clear();
-        rangeAfterEquals.insertText(convertToSuperscripts(newResultText), "Start");
+        // insertHtml(..., "Replace") does the clear + insert in one queued op
+        rangeAfterEquals.insertHtml(mathStringToHtml(newResultText), "Replace");
       }
 
       await context.sync(); // ← SYNC 3: write all results
     }
   });
 
-  // ── 4. Render the dataframe table ────────────────────────────
+  // ── 5. Render the dataframe table ────────────────────────────
   renderTable(df);
 
-  // ── 5. Status ────────────────────────────────────────────────
+  // ── 6. Status ────────────────────────────────────────────────
   if (errors.length > 0) {
-    setStatus("Done with " + errors.length + " warning(s)" + errors, "err");
+    setStatus("Done with " + errors.length + " warning(s) 😢", "err");
     console.warn("Calcs for word warnings:", errors);
     const el = document.getElementById("bad-flash-overlay");
     el.classList.remove("flash-active");
@@ -315,24 +285,32 @@ function renderTable(df) {
 
       const valClass = "col-val" + (row.valueStr === "ERROR" ? " nan" : "");
 
+      // Render equation/value through the HTML converter so exponents show
+      // as real superscripts in the sidebar too, not escaped caret text.
       tr.innerHTML =
         `<td class="col-name">${escapeHtml(row.name)}</td>` +
-        `<td class="col-eq">${escapeHtml(row.equation)}</td>` +
-        `<td class="${valClass}">${escapeHtml(row.valueStr)}</td>`;
+        `<td class="col-eq">${mathStringToHtml(row.equation)}</td>` +
+        `<td class="${valClass}">${mathStringToHtml(row.valueStr)}</td>`;
 
       tbody.appendChild(tr);
     }
   }
 }
+
 // ─── Insert character ─────────────────────────────────────────
-async function insertCharacterToDocument(character, modal) {
+// isPower: when true, insert as a real HTML <sup> instead of a literal glyph.
+async function insertCharacterToDocument(character, modal, isPower) {
   try {
     await Word.run(async (context) => {
       // Get the current selection (cursor position)
       const selection = context.document.getSelection();
 
-      // Insert the character at the cursor, replacing any selected text
-      selection.insertText(character, Word.InsertLocation.replace);
+      if (isPower) {
+        // Real superscript formatting via HTML, not a Unicode look-alike.
+        selection.insertHtml("<sup>" + escapeHtml(character) + "</sup>", Word.InsertLocation.replace);
+      } else {
+        selection.insertText(character, Word.InsertLocation.replace);
+      }
 
       await context.sync();
     });
@@ -354,7 +332,8 @@ function setStatus(msg, cls) {
   el.textContent = msg;
   el.className = cls || "";
 }
-//remove whitespace from strings
+
+// remove whitespace from strings
 function clean(str) {
   if (!str == "") {
     return str.replace(/\s/g, "");
@@ -362,14 +341,53 @@ function clean(str) {
     return null;
   }
 }
-function convertSuperscripts(str) {
-  if (!str) return str;
-  return str.replace(/²/g, "^2").replace(/³/g, "^3").replace(/⁴/g, "^4").replace(/⁶/g, "^6");
+
+/**
+ * Walk a Word paragraph's HTML (from range.getHtml()) and turn it into a
+ * math.js-evaluable string:
+ *   <sup>2</sup>  → ^(2)
+ *   everything else's text content is kept, tags are dropped.
+ *   Legacy support for Unicode superscripts is also included (²³⁴⁶ → ^2, ^3, ^4, ^6).
+ */
+function htmlToMathExpr(html) {
+  if (!html) return "";
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  return walkNodeForMath(doc.body).trim();
 }
-function convertToSuperscripts(str) {
-  if (!str) return str;
-  return str.replace(/\^2/g, "²").replace(/\^3/g, "³").replace(/\^4/g, "⁴").replace(/\^6/g, "⁶");
+
+function walkNodeForMath(node) {
+  let out = "";
+  for (const child of node.childNodes) {
+    if (child.nodeType === Node.TEXT_NODE) {
+      out += child.textContent;
+    } else if (child.nodeType === Node.ELEMENT_NODE) {
+      const tag = child.tagName.toLowerCase();
+      if (tag === "sup") {
+        out += "^(" + walkNodeForMath(child).trim() + ")";
+      } else if (tag === "br") {
+        out += " ";
+      } else {
+        out += walkNodeForMath(child);
+      }
+    }
+  }
+  out = out.replace(/²/g, "^2").replace(/³/g, "^3").replace(/⁴/g, "^4").replace(/⁶/g, "^6");
+  return out;
 }
+
+/**
+ * Turn a math.js-formatted string (caret-notation exponents, e.g. "m^2" or
+ * "m^(-2)") into HTML with real <sup> tags, for insertHtml() / table display.
+ */
+function mathStringToHtml(str) {
+  if (str === null || str === undefined) return "";
+  let escaped = escapeHtml(String(str));
+  escaped = escaped.replace(/\^\(([^)]+)\)/g, "<sup>$1</sup>");
+  escaped = escaped.replace(/\^(-?\d+(?:\.\d+)?)/g, "<sup>$1</sup>");
+  escaped = escaped.replace(/\^2/g, "²").replace(/\^3/g, "³").replace(/\^4/g, "⁴").replace(/\^6/g, "⁶")
+  return escaped;
+}
+
 /**
  * Count the number of decimal places in the numeric part of an answer string.
  * e.g. "3.14 m^2" → 2,  "42 kN" → 0,  "0.1800" → 4,  "42" → 0
@@ -377,7 +395,6 @@ function convertToSuperscripts(str) {
  */
 function countDecimalPlaces(answerStr) {
   if (!answerStr) return null;
-  // Match an optional sign, digits, optional decimal point + decimals
   const m = answerStr.trim().match(/^[-+]?\d+(\.\d*)?/);
   if (!m) return null;
   if (!m[1]) return 0; // integer – no decimal point present
@@ -389,7 +406,7 @@ function countDecimalPlaces(answerStr) {
  * If decimalPlaces is provided (>= 0) the numeric part is rounded and
  * zero-padded to exactly that many decimal places, matching what was
  * already in the document.
- * Returns a string like "0.18 m^2" or "42" (unitless).
+ * Returns a plain caret-notation string like "0.18 m^2" or "42" (unitless).
  */
 function formatValue(val, decimalPlaces) {
   if (val === null || val === undefined) return "NaN";
@@ -398,7 +415,6 @@ function formatValue(val, decimalPlaces) {
 
   // Check if it's a math.js Unit
   if (math.isUnit && math.isUnit(val)) {
-    // Get the numeric magnitude and unit string separately
     const numericPart = val.toNumber(); // magnitude in current unit
     const unitStr = val
       .format({ precision: 15 }) // e.g. "3.14159265 m^2"
@@ -412,8 +428,7 @@ function formatValue(val, decimalPlaces) {
       numStr = String(parseFloat(numericPart.toPrecision(5)));
     }
 
-    const result = unitStr ? numStr + " " + unitStr : numStr;
-    return convertSuperscripts(result);
+    return unitStr ? numStr + " " + unitStr : numStr;
   }
 
   // Check if it's a plain number
@@ -435,7 +450,6 @@ function formatValue(val, decimalPlaces) {
 function isErrorValue(val) {
   if (val === null || val === undefined) return true;
   if (typeof val === "number" && !isFinite(val)) return true;
-  // math.js might return error objects in some cases
   if (val instanceof Error) return true;
   return false;
 }

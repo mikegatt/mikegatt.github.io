@@ -34,11 +34,9 @@ Most SI and engineering units are supported as well as some imperial units.
 
 ## Greek and powers
 
-The app understands plain unicode characters without formatting so anything formatted with subscript or superscript will just be read as normal text as if it isnt subscript/superscript. Therefore, to use power signs, either inline notation can be used (e.g. x\^2 = ) or unicode squares, cubes and quads can be pasted in from the cheat sheet.
+The app understands powers written as unicode powers, formatted as superscript or written out inline. Subscripts are always just treated in the background as if they aren't formatted subscript. Note that variables containing commas, brackets and 'min' or 'max' will throw a hissy for this reason as they will be treated like an equation!
 
-Greek unicode characters are also available on the cheat sheet button and can be pasted in.
-
-Note that double clicking a character will select just that character and keyboard shortcuts can be used for copy/paste.
+Greek unicode characters are available on the cheat sheet button and can be clicked on to insert them. Alternatively, the emoji keyboard can be used (ctrl+cmd+space)
 
 ## Errors
 
