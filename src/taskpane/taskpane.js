@@ -64,167 +64,115 @@ async function runUpdate(updateSelection) {
   }
 }
 
-/**
- * Main Office.js routine – reads every paragraph's HTML, classifies it,
- * then searches and replaces the result (as HTML) in the same iteration.
- *
- * Sync plan (3 round trips total):
- *   SYNC 1 — cheap paragraph text, just to find '=' lines
- *   SYNC 2 — resolve getHtml() AND search("=") together for every
- *            candidate paragraph, so both are ready before we parse
- *   SYNC 3 — execute all queued writes (clear/insertHtml)
- */
 async function Excel_or_Word_update(updateSelection) {
   const errors = [];
+  let sawAnyEquals = false;
 
   await Word.run(async function (context) {
-    // ── 1. Load all paragraph plain text (cheap first pass) ─────
-    let paras;
-    if (updateSelection == true) {
-      paras = context.document.getSelection().paragraphs;
-    } else {
-      paras = context.document.body.paragraphs;
-    }
-    paras.load("text");
-    await context.sync(); // ← SYNC 1: cheap text pass, just to find '=' lines
+    const target = updateSelection ? context.document.getSelection() : context.document.body;
 
-    // ── 2. For lines that contain '=', request HTML *and* queue a
-    //       search for the last '=' at the same time. We don't yet
-    //       know which lines will need a text update, but search() is
-    //       cheap, and queuing it now avoids a dedicated round trip
-    //       later just to resolve search positions. ────────────────
-    const htmlRequests = []; // { index, range, htmlResult, searchResults }
-    for (let i = 0; i < paras.items.length; i++) {
-      if (!paras.items[i].text.includes("=")) continue;
-      const range = paras.items[i].getRange("Whole");
-      const htmlResult = range.getHtml();
-      const searchResults = range.search("=", { matchCase: true });
-      searchResults.load("items");
-      htmlRequests.push({ index: i, range, htmlResult, searchResults });
-    }
+    const htmlResult = target.getHtml();
+    const eqSearch = target.search("=", { matchCase: true });
+    eqSearch.load("items");
 
-    if (htmlRequests.length === 0) {
-      renderTable(df);
-      setStatus("No definition or calculation lines found.");
-      return;
-    }
+    await context.sync(); // ← SYNC A: HTML + every "=" position, together
 
-    await context.sync(); // ← SYNC 2: resolve HTML + search together for candidate paragraphs
+    const parsedDoc = new DOMParser().parseFromString(htmlResult.value, "text/html");
+    // Word's HTML export puts each paragraph in its own <p>, including
+    // paragraphs nested inside table cells.
+    const paragraphEls = Array.from(parsedDoc.querySelectorAll("p"));
 
-    // ── 3. Parse, classify, and queue replacements ───────────────
-    // (search results are already resolved — no extra sync needed to use them)
-    const writeOps = [];
+    const writeOps = []; // { lastEqRange, newValueStr }
+    let searchCursor = 0; // walks eqSearch.items in document order
 
-    for (const { index: i, range, htmlResult, searchResults } of htmlRequests) {
-      const fullExpr = htmlToMathExpr(htmlResult.value); // convert <sup> to ^(x) notation
+    for (let i = 0; i < paragraphEls.length; i++) {
+      const pEl = paragraphEls[i];
+      const fullExpr = walkNodeForMath(pEl).trim();
+      const eqCountInPara = (fullExpr.match(/=/g) || []).length;
+      if (eqCountInPara === 0) continue;
+      sawAnyEquals = true;
 
-      // ── Discard lineName via ';' split first ────────────────
-      const rawLine = fullExpr.includes(";")
-        ? clean(fullExpr.split(";")[1])
-        : clean(fullExpr);
+      // The Range for THIS paragraph's LAST "=" — consume eqCountInPara
+      // items off the front of the flat, document-ordered search results.
+      const lastEqRange = eqSearch.items[searchCursor + eqCountInPara - 1];
+      searchCursor += eqCountInPara;
 
-      // ── If the second to last term has an operator, it is calculated ──
-      let splitLine = rawLine.split("=");
-      let l = splitLine.length - 2;
-      let typeSwitch = /[/*\-+?^]|min|max/.test(splitLine[l]) ? "CALCULATED" : "DEFINED";
+      const rawLine = fullExpr.includes(";") ? clean(fullExpr.split(";")[1]) : clean(fullExpr);
+      const splitLine = rawLine.split("=");
+      const l = splitLine.length - 2;
+      const typeSwitch = /[/*\-+?^]|min|max/.test(splitLine[l]) ? "CALCULATED" : "DEFINED";
       let row = null;
 
-      switch (typeSwitch) {
-        // ── DEFINED variable ─────────────────
-        case "DEFINED": {
-          const [lineVar, lineResult] = rawLine.split("=");
-          try {
-            const unitValue = math.evaluate(lineResult);
-            scope[lineVar] = unitValue;
-            row = {
-              name: lineVar,
-              equation: lineResult,
-              value: unitValue,
-              valueStr: formatValue(unitValue),
-              paraIndex: i,
-            };
-          } catch (err) {
-            errors.push(
-              `Line ${i + 1}: could not parse "${lineResult}" as a unit or number. Error: ${err.message}`
-            );
-          }
-          break;
-        }
-
-        // ── CALCULATED line ──────────────────
-        case "CALCULATED": {
-          let lineVar, expression, answer, targetunits, existingDecimalPlaces;
-          targetunits = "";
-          const parts = rawLine.split("=");
-          parts.length == 3
-            ? ([lineVar, expression, answer] = parts)
-            : ([expression, answer] = parts);
-          if (answer.slice(0, 5) !== "ERROR" && answer !== "") {
-            answer = clean(answer);
-            targetunits = answer.replace(/^[-+]?\d+\.?\d*\s*/, "");
-            existingDecimalPlaces = countDecimalPlaces(answer);
-          } else {
-            answer = "";
-          }
-
-          let newValueStr;
-          let calcResult = null;
-
-          try {
-            const evalResult =
-              targetunits !== ""
-                ? math.evaluate(expression + " to " + targetunits, scope)
-                : math.evaluate(expression, scope);
-
-            if (isErrorValue(evalResult)) {
-              errors.push(
-                `Line ${i + 1} (${lineVar}): expression "${expression}" evaluated to an error.`
-              );
-              newValueStr = "ERROR";
-            } else {
-              scope[lineVar] = evalResult;
-              calcResult = evalResult;
-              newValueStr = formatValue(evalResult, existingDecimalPlaces);
-            }
-          } catch (err) {
-            errors.push(
-              `Line ${i + 1} (${lineVar}): expression "${expression}" failed. ${err.message}`
-            );
-            newValueStr = "ERROR: " + err.message;
-          }
-
+      if (typeSwitch === "DEFINED") {
+        const [lineVar, lineResult] = rawLine.split("=");
+        try {
+          const unitValue = math.evaluate(lineResult);
+          scope[lineVar] = unitValue;
           row = {
             name: lineVar,
-            equation: expression,
-            value: calcResult,
-            valueStr: newValueStr,
+            equation: lineResult,
+            value: unitValue,
+            valueStr: formatValue(unitValue),
             paraIndex: i,
           };
+        } catch (err) {
+          errors.push(
+            `Line ${i + 1}: could not parse "${lineResult}" as a unit or number. Error: ${err.message}`
+          );
+        }
+      } else if (typeSwitch === "CALCULATED") {
+        let lineVar, expression, answer, targetunits, existingDecimalPlaces;
+        targetunits = "";
+        const parts = rawLine.split("=");
+        parts.length == 3 ? ([lineVar, expression, answer] = parts) : ([expression, answer] = parts);
+        if (answer.slice(0, 5) !== "ERROR" && answer !== "") {
+          answer = clean(answer);
+          targetunits = answer.replace(/^[-+]?\d+\.?\d*\s*/, "");
+          existingDecimalPlaces = countDecimalPlaces(answer);
+        } else {
+          answer = "";
+        }
 
-          // Queue a write for this line if the document text needs updating.
-          // The search results are already resolved (queued back in step 2),
-          // so we can go straight to computing the write — no extra sync.
-          const m2 = rawLine.match(/^(.*)=([^=]*)$/);
-          if (!m2) break;
-          const [, beforeLastEquals] = m2;
-          if (clean(rawLine) === clean(beforeLastEquals + "=" + newValueStr)) break;
+        let newValueStr;
+        let calcResult = null;
+        try {
+          const evalResult =
+            targetunits !== ""
+              ? math.evaluate(expression + " to " + targetunits, scope)
+              : math.evaluate(expression, scope);
 
-          if (searchResults.items.length === 0) {
-            errors.push(`Line ${i + 1}: could not locate '=' to update text.`);
-            break;
+          if (isErrorValue(evalResult)) {
+            errors.push(`Line ${i + 1} (${lineVar}): expression "${expression}" evaluated to an error.`);
+            newValueStr = "ERROR";
+          } else {
+            scope[lineVar] = evalResult;
+            calcResult = evalResult;
+            newValueStr = clean(formatValue(evalResult, existingDecimalPlaces));
           }
-          writeOps.push({ searchResults, newResultText: newValueStr, paraRange: range });
-          break;
+        } catch (err) {
+          errors.push(`Line ${i + 1} (${lineVar}): expression "${expression}" failed. ${err.message}`);
+          newValueStr = "ERROR: " + err.message.replace('=','');
         }
 
-        // ── Unexpected format ───────────────────────────────────
-        default: {
-          errors.push(`Line ${i + 1}: unexpected number of '=' signs (${rawLine.split("=").length - 1}).`);
-          break;
+        row = {
+          name: lineVar,
+          equation: expression,
+          value: calcResult,
+          valueStr: newValueStr,
+          paraIndex: i,
+        };
+
+        const m2 = rawLine.match(/^(.*)=([^=]*)$/);
+        if (m2) {
+          const [, beforeLastEquals] = m2;
+          if (clean(rawLine) !== clean(beforeLastEquals + "=" + newValueStr)) {
+            writeOps.push({ lastEqRange, newValueStr });
+          }
         }
+      } else {
+        errors.push(`Line ${i + 1}: unexpected number of '=' signs (${rawLine.split("=").length - 1}).`);
       }
 
-      // ── Store / update the dataframe row ─────────────────────
       if (row) {
         const existing = df.findIndex((e) => e.name === row.name);
         if (existing !== -1) df[existing] = row;
@@ -232,37 +180,36 @@ async function Excel_or_Word_update(updateSelection) {
       }
     }
 
-    // ── 4. Execute all writes in one shot ─────────────────────────
-    if (writeOps.length > 0) {
-      for (const { searchResults, newResultText, paraRange } of writeOps) {
-        const lastEquals = searchResults.items[searchResults.items.length - 1];
-        const rangeAfterEquals = lastEquals.getRange("After").expandTo(paraRange.getRange("End"));
-        // insertHtml(..., "Replace") does the clear + insert in one queued op
-        rangeAfterEquals.insertHtml(mathStringToHtml(newResultText), "Replace");
-      }
+    // Queue every write, chaining straight off already-resolved search
+    // Range objects. Only the small answer fragment for each changed line
+    // is touched — everything else in the document is never re-serialized.
+    for (const { lastEqRange, newValueStr } of writeOps) {
+      const paraEnd = lastEqRange.paragraphs.getFirst().getRange("End");
+      const rangeAfterEquals = lastEqRange.getRange("After").expandTo(paraEnd);
+      rangeAfterEquals.insertHtml(mathStringToHtml(newValueStr), "Replace");
+    }
 
-      await context.sync(); // ← SYNC 3: write all results
+    if (writeOps.length > 0) {
+      await context.sync(); // ← SYNC B: execute all targeted writes in one shot
     }
   });
 
-  // ── 5. Render the dataframe table ────────────────────────────
   renderTable(df);
 
-  // ── 6. Status ────────────────────────────────────────────────
   if (errors.length > 0) {
-    setStatus("Done with " + errors.length + " warning(s) 😢", "err");
+    setStatus("Done with " + errors.length + " warning(s) 😬", "err");
     console.warn("Calcs for word warnings:", errors);
     const el = document.getElementById("bad-flash-overlay");
     el.classList.remove("flash-active");
-    void el.offsetWidth; // force reflow
+    void el.offsetWidth;
     el.classList.add("flash-active");
-  } else if (df.length === 0) {
+  } else if (!sawAnyEquals) {
     setStatus("No definition or calculation lines found.");
   } else {
     setStatus("✓  Updated " + df.length + " variable(s) successfully.", "ok");
     const el = document.getElementById("ok-flash-overlay");
     el.classList.remove("flash-active");
-    void el.offsetWidth; // force reflow
+    void el.offsetWidth;
     el.classList.add("flash-active");
   }
 }
@@ -278,8 +225,9 @@ function renderTable(df) {
       '<tr class="empty-row"><td colspan="3">No variables found in this document.</td></tr>';
     return;
   }
+  const sortedRows = [...df].sort((a, b) => String(a.name).localeCompare(String(b.name)));
 
-  for (const row of df) {
+  for (const row of sortedRows) {
     if (row.name !== undefined) {
       const tr = document.createElement("tr");
 
